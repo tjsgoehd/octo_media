@@ -21,7 +21,6 @@
             word-break: keep-all;
         }
         
-        /* 카드 디자인: 부드러운 그림자 및 모바일 최적화 */
         .video-card { 
             background: white; 
             border-radius: 16px; 
@@ -38,13 +37,26 @@
             }
         }
         
-        /* 카테고리 버튼 모바일 최적화 */
+        .search-container {
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .search-input {
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .search-input:focus {
+            box-shadow: 0 4px 20px rgba(50, 108, 244, 0.1);
+            border-color: var(--primary);
+        }
+        
         .category-btn { 
             transition: all 0.2s; 
             border: 1px solid #eee; 
             background: white; 
             color: #667085;
             flex-shrink: 0;
+            font-weight: 700;
         }
         .category-btn.active { 
             background-color: var(--primary); 
@@ -53,7 +65,6 @@
             box-shadow: 0 4px 12px rgba(50, 108, 244, 0.25); 
         }
         
-        /* 모달 애니메이션 */
         .modal-content { 
             animation: modalUp 0.35s cubic-bezier(0.16, 1, 0.3, 1); 
             border-radius: 24px;
@@ -63,7 +74,6 @@
             to { opacity: 1; transform: translateY(0); } 
         }
         
-        /* 모바일 텍스트 생략 처리 */
         .line-clamp-2 {
             display: -webkit-box;
             -webkit-line-clamp: 2;
@@ -71,11 +81,9 @@
             overflow: hidden;
         }
 
-        /* 스크롤바 숨기기 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* 터치 타겟 크기 확보 */
         button, a { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
     </style>
 </head>
@@ -84,7 +92,7 @@
     <canvas id="thumb-canvas" class="hidden"></canvas>
     <video id="temp-video" preload="metadata" crossorigin="anonymous" class="hidden"></video>
 
-    <!-- 상단 헤더: 모바일 버튼 겹침 방지 최적화 -->
+    <!-- 상단 헤더 -->
     <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div class="max-w-7xl mx-auto px-4 h-14 md:h-18 flex items-center justify-between">
             <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
@@ -107,48 +115,66 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-6 md:py-10">
-        <!-- 메인 타이틀 모바일 최적화 -->
-        <div class="mb-8 text-center px-2">
+        <!-- 메인 타이틀 -->
+        <div class="mb-6 text-center px-2">
             <h1 class="text-2xl md:text-4xl font-black mb-1.5 tracking-tight flex items-center justify-center gap-2">
                 <span>🔥</span> 옥패영상 저장소 <span>🔥</span>
             </h1>
-            <p class="text-slate-500 text-xs md:text-base font-medium opacity-80">Cloudinary 호스팅 기반 영구 데이터베이스</p>
+            <p class="text-slate-500 text-[10px] md:text-sm font-bold opacity-80 uppercase tracking-widest">Permanent Video Archive</p>
+        </div>
+
+        <!-- 검색창 섹션 -->
+        <div class="mb-8 max-w-2xl mx-auto">
+            <div class="search-container relative group">
+                <button 
+                    onclick="triggerSearch()"
+                    class="absolute inset-y-0 left-4 flex items-center z-10 hover:text-blue-600 transition-colors"
+                    title="검색"
+                >
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 group-focus-within:text-blue-500"></i>
+                </button>
+                <input 
+                    type="text" 
+                    id="search-input"
+                    onkeydown="if(event.key === 'Enter') triggerSearch()"
+                    placeholder="검색어를 입력하고 엔터를 누르세요" 
+                    class="search-input w-full bg-white text-sm py-4 pl-11 pr-4 rounded-2xl outline-none transition-all placeholder:text-slate-400 placeholder:font-medium font-bold"
+                >
+            </div>
         </div>
 
         <!-- 카테고리 & 상태 표시 -->
         <div class="flex flex-col gap-4 mb-6">
             <div id="category-container" class="flex gap-2 overflow-x-auto no-scrollbar py-1">
-                <!-- 카테고리 버튼 렌더링 영역 -->
+                <!-- 카테고리 버튼 렌더링 -->
             </div>
             <div class="flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-white/50 self-start px-3 py-1 rounded-full border border-gray-100">
                 <div class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                <span id="sync-status">실시간 클라우드 연결됨</span>
+                <span id="sync-status">Cloud DB Live Connected</span>
             </div>
         </div>
 
-        <!-- 비디오 그리드: 모바일 2단(grid-cols-2) 강제 적용 -->
+        <!-- 비디오 그리드 -->
         <div id="video-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
-            <div id="initial-loading" class="col-span-full flex flex-col items-center justify-center py-24 gap-4">
-                <div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p class="text-slate-400 text-xs font-bold tracking-widest uppercase">Syncing Database...</p>
+            <div id="initial-loading" class="col-span-full py-20 flex flex-col items-center justify-center gap-4 text-slate-400">
+                <div class="w-8 h-8 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+                <span class="text-[10px] font-black tracking-widest uppercase">Fetching Data...</span>
             </div>
         </div>
     </main>
 
-    <!-- 업로드 모달 최적화 -->
+    <!-- 업로드 모달 등 생략 (기존과 동일) -->
     <div id="upload-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] hidden items-center justify-center p-3">
         <div class="bg-white modal-content w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
             <div class="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-                <h2 class="text-base font-black text-slate-900">영구 저장용 영상 업로드</h2>
+                <h2 class="text-base font-black text-slate-900">새로운 영상 아카이빙</h2>
                 <button onclick="toggleUploadModal(false)" class="text-slate-400 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            
             <form id="upload-form" class="p-5 space-y-4 overflow-y-auto no-scrollbar">
                 <div class="space-y-1.5">
                     <label class="text-[11px] font-black text-slate-500 uppercase ml-1">제목</label>
-                    <input required id="video-title" type="text" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:border-blue-500 outline-none transition-all" placeholder="영상 제목을 입력하세요">
+                    <input required id="video-title" type="text" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:border-blue-500 outline-none transition-all" placeholder="영상 제목">
                 </div>
-
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1.5">
                         <label class="text-[11px] font-black text-slate-500 uppercase ml-1">카테고리</label>
@@ -163,26 +189,23 @@
                         <input required id="video-author" type="text" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold" value="GetStar">
                     </div>
                 </div>
-
                 <div class="space-y-1.5">
                     <label class="text-[11px] font-black text-slate-500 uppercase ml-1">파일 선택</label>
                     <input type="file" id="video-file-input" class="hidden" accept="video/*">
-                    <div id="upload-dropzone" onclick="document.getElementById('video-file-input').click()" class="border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-all cursor-pointer">
+                    <div id="upload-dropzone" onclick="document.getElementById('video-file-input').click()" class="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-all cursor-pointer">
                         <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-300"></i>
-                        <p id="dropzone-text" class="text-[11px] text-slate-400 font-bold text-center">터치하여 영상 파일을 선택하세요</p>
+                        <p id="dropzone-text" class="text-[11px] text-slate-400 font-black text-center">터치하여 영상 파일 선택 (MP4 등)</p>
                     </div>
                 </div>
-
                 <div id="thumb-selection-area" class="space-y-2 hidden">
                     <label class="text-[11px] font-black text-slate-500 uppercase ml-1">썸네일 선택</label>
                     <div id="thumbnail-grid" class="grid grid-cols-5 gap-1.5"></div>
                 </div>
-
-                <div class="pt-2 border-t border-gray-50 mt-4">
-                    <button id="submit-btn" type="submit" class="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-100 active:scale-95 transition-all text-sm disabled:bg-slate-300">데이터베이스 영구 저장</button>
+                <div class="pt-4">
+                    <button id="submit-btn" type="submit" class="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-100 active:scale-95 transition-all text-sm disabled:bg-slate-300">클라우드에 저장하기</button>
                     <div id="upload-progress-container" class="hidden mt-4">
-                        <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-1 px-1">
-                            <span id="progress-text">업로드 중...</span>
+                        <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
+                            <span id="progress-text">데이터 업로드 중...</span>
                             <span id="progress-percent">0%</span>
                         </div>
                         <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -194,30 +217,32 @@
         </div>
     </div>
 
-    <!-- 플레이어 모달 최적화 -->
-    <div id="player-modal" class="fixed inset-0 bg-slate-900/95 z-[200] hidden flex-col items-center justify-center">
-        <div class="w-full max-w-4xl bg-black aspect-video relative">
-            <button onclick="closePlayer()" class="absolute -top-12 right-0 text-white p-2 flex items-center gap-2 font-bold text-sm">
+    <!-- 플레이어 모달 -->
+    <div id="player-modal" class="fixed inset-0 bg-slate-900/98 z-[200] hidden flex-col items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-black rounded-2xl overflow-hidden shadow-2xl relative">
+            <button onclick="closePlayer()" class="absolute -top-12 right-0 text-white p-2 flex items-center gap-2 font-black text-sm">
                 닫기 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
-            <div id="video-container" class="w-full h-full"></div>
+            <div id="video-container" class="w-full aspect-video bg-black flex items-center justify-center"></div>
         </div>
-        <div class="w-full max-w-4xl p-6 text-white">
+        <div class="w-full max-w-4xl py-6 text-white px-2">
             <span id="playing-category" class="text-blue-400 text-[10px] font-black uppercase tracking-widest"></span>
-            <h2 id="playing-title" class="text-lg font-bold mt-1 line-clamp-2"></h2>
-            <button onclick="closePlayer()" class="mt-6 w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl font-bold text-sm transition-all">목록으로 돌아가기</button>
+            <h2 id="playing-title" class="text-xl font-black mt-2 leading-tight"></h2>
+            <div class="mt-6 flex gap-3">
+                <button onclick="closePlayer()" class="flex-1 bg-white/10 hover:bg-white/20 py-4 rounded-2xl font-black text-sm transition-all border border-white/5">목록보기</button>
+            </div>
         </div>
     </div>
 
-    <!-- 관리자 로그인 모달 -->
+    <!-- 관리자 로그인 -->
     <div id="login-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] hidden items-center justify-center p-6">
-        <div class="bg-white modal-content w-full max-w-xs p-6 shadow-2xl text-center">
-            <h2 class="text-lg font-black mb-6">ADMIN AUTH</h2>
+        <div class="bg-white modal-content w-full max-w-xs p-8 shadow-2xl text-center">
+            <h2 class="text-xl font-black mb-6 tracking-tighter">관리자 인증</h2>
             <form id="login-form" class="space-y-4">
-                <input required id="login-password" type="password" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-center text-xl tracking-widest focus:bg-white outline-none" placeholder="••••">
-                <div id="login-error" class="text-red-500 text-[10px] font-bold hidden">인증 번호가 올바르지 않습니다</div>
-                <button type="submit" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold text-sm">로그인</button>
-                <button type="button" onclick="toggleLoginModal(false)" class="text-slate-400 text-xs font-bold pt-2">취소</button>
+                <input required id="login-password" type="password" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 text-center text-2xl tracking-[0.5em] focus:bg-white outline-none font-bold" placeholder="••••">
+                <div id="login-error" class="text-red-500 text-[10px] font-black hidden uppercase">Access Denied: Wrong Password</div>
+                <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-sm active:scale-95 transition-all">인증 확인</button>
+                <button type="button" onclick="toggleLoginModal(false)" class="text-slate-400 text-xs font-black pt-2 uppercase">Close</button>
             </form>
         </div>
     </div>
@@ -247,6 +272,7 @@
         let currentUser = null;
         let allVideos = [];
         let currentCategory = '전체';
+        let searchQuery = '';
         let unsubscribe = null;
         let selectedThumbBase64 = '';
         let selectedVideoFile = null;
@@ -272,28 +298,48 @@
             });
         }
 
+        // 검색 실행 함수 (엔터 또는 버튼 클릭 시 호출)
+        window.triggerSearch = () => {
+            const input = document.getElementById('search-input');
+            searchQuery = input.value.trim().toLowerCase();
+            renderVideos();
+        };
+
         window.renderVideos = () => {
             const grid = document.getElementById('video-grid');
-            const filtered = currentCategory === '전체' ? allVideos : allVideos.filter(v => v.category === currentCategory);
+            let filtered = allVideos;
+            
+            if (currentCategory !== '전체') {
+                filtered = filtered.filter(v => v.category === currentCategory);
+            }
+            
+            if (searchQuery) {
+                filtered = filtered.filter(v => 
+                    v.title.toLowerCase().includes(searchQuery) || 
+                    v.author.toLowerCase().includes(searchQuery)
+                );
+            }
             
             if (filtered.length === 0) {
-                grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-300 font-bold text-sm italic">등록된 영상이 없습니다.</div>`;
+                grid.innerHTML = `<div class="col-span-full py-24 text-center text-slate-400 font-bold text-xs italic bg-white/30 rounded-3xl border border-dashed border-slate-200 uppercase tracking-widest">No matching videos found</div>`;
                 return;
             }
 
             grid.innerHTML = filtered.map(v => `
-                <div class="video-card group active:scale-95" onclick="playVideo('${v.url}', '${v.title}', '${v.category}')">
-                    <div class="aspect-video relative bg-slate-200">
+                <div class="video-card group active:scale-95 cursor-pointer" onclick="playVideo('${v.url}', '${v.title}', '${v.category}')">
+                    <div class="aspect-video relative bg-slate-100">
                         <img src="${v.thumbnail}" class="w-full h-full object-cover">
-                        <div class="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <i data-lucide="play" class="text-white w-8 h-8 drop-shadow-lg"></i>
+                        <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xl">
+                                <i data-lucide="play" class="text-blue-600 w-4 h-4 ml-1" fill="currentColor"></i>
+                            </div>
                         </div>
                     </div>
                     <div class="p-3">
-                        <div class="text-[9px] font-black text-blue-600 mb-1 uppercase tracking-widest">${v.category}</div>
-                        <h3 class="font-bold text-slate-900 text-xs md:text-sm line-clamp-2 h-8 md:h-10 leading-snug">${v.title}</h3>
-                        <div class="mt-2 pt-2 border-t border-gray-50 flex items-center gap-1.5 text-[10px] text-slate-400 font-bold">
-                            <div class="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center"><i data-lucide="user" class="w-2.5 h-2.5"></i></div>
+                        <div class="text-[9px] font-black text-blue-600 mb-1 uppercase tracking-widest opacity-80">${v.category}</div>
+                        <h3 class="font-bold text-slate-900 text-xs line-clamp-2 h-8 leading-snug tracking-tight">${v.title}</h3>
+                        <div class="mt-2 pt-2 border-t border-slate-50 flex items-center gap-1.5 text-[9px] text-slate-400 font-bold">
+                            <div class="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center"><i data-lucide="user" class="w-2 h-2"></i></div>
                             <span class="truncate">${v.author}</span>
                         </div>
                     </div>
@@ -302,13 +348,13 @@
             lucide.createIcons();
         };
 
-        // 업로드 및 기타 로직
+        // 기타 기능 함수들 (기존과 동일)
         const videoInput = document.getElementById('video-file-input');
         videoInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
             selectedVideoFile = file;
-            document.getElementById('dropzone-text').innerText = "분석 중: " + file.name;
+            document.getElementById('dropzone-text').innerText = "파일 분석 중...";
             const videoUrl = URL.createObjectURL(file);
             const video = document.getElementById('temp-video');
             video.src = videoUrl;
@@ -334,7 +380,7 @@
                     thumbGrid.appendChild(thumbDiv);
                 }
                 document.getElementById('thumb-selection-area').classList.remove('hidden');
-                document.getElementById('dropzone-text').innerText = "파일 준비 완료: " + file.name;
+                document.getElementById('dropzone-text').innerText = "업로드 준비 완료: " + file.name;
             };
         });
 
@@ -398,12 +444,14 @@
         };
 
         window.playVideo = (u, t, c) => {
-            document.getElementById('video-container').innerHTML = `<video src="${u}" controls autoplay class="w-full h-full"></video>`;
+            const container = document.getElementById('video-container');
+            container.innerHTML = `<video src="${u}" controls autoplay class="w-full h-full object-contain"></video>`;
             document.getElementById('playing-title').innerText = t;
             document.getElementById('playing-category').innerText = c;
             document.getElementById('player-modal').classList.remove('hidden');
             document.getElementById('player-modal').classList.add('flex');
             document.body.style.overflow = 'hidden';
+            lucide.createIcons();
         };
         window.closePlayer = () => { 
             document.getElementById('video-container').innerHTML = ""; 
@@ -415,7 +463,7 @@
         function renderCategories() {
             const cats = ['전체', '단기컷', '공략', '기타'];
             document.getElementById('category-container').innerHTML = cats.map(cat => `
-                <button onclick="filterByCategory('${cat}')" class="category-btn px-5 py-2 rounded-full text-xs font-black ${currentCategory === cat ? 'active' : ''}">
+                <button onclick="filterByCategory('${cat}')" class="category-btn px-5 py-2 rounded-full text-xs ${currentCategory === cat ? 'active' : ''}">
                     ${cat}
                 </button>
             `).join('');
