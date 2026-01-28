@@ -460,30 +460,39 @@
             modal.classList.replace('hidden', 'flex');
         };
 
-        // 영상 삭제 기능
+        // 영상 삭제 기능 (이전 방식/오류 게시물 대응 로직 추가)
         window.deleteVideo = async () => {
             if (!currentEditingVideo) return;
-            if (!confirm(`[${currentEditingVideo.title}] 게시물을 정말 삭제할까요?\n구글 드라이브 원본 파일도 함께 삭제됩니다.`)) return;
+            if (!confirm(`[${currentEditingVideo.title}] 게시물을 정말 삭제할까요?\n데이터베이스와 드라이브 파일이 정리됩니다.`)) return;
 
-            showLoading("삭제 중입니다...");
+            showLoading("데이터 정리 중...");
             try {
-                // 1. 구글 드라이브 파일 삭제
-                if (accessToken) {
-                    await fetch(`https://www.googleapis.com/drive/v3/files/${currentEditingVideo.fileId}`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${accessToken}` }
-                    });
+                // 1. 구글 드라이브 파일 삭제 시도
+                if (accessToken && currentEditingVideo.fileId) {
+                    try {
+                        const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files/${currentEditingVideo.fileId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        
+                        // 드라이브에 파일이 없더라도(404) 파이어베이스 데이터는 삭제를 계속 진행해야 함
+                        if (!driveRes.ok && driveRes.status !== 404) {
+                            console.warn("Google Drive deletion non-critical error:", driveRes.status);
+                        }
+                    } catch (driveErr) {
+                        console.error("Drive file might already be gone or invalid:", driveErr);
+                    }
                 }
 
-                // 2. 파이어베이스 데이터 삭제
+                // 2. 파이어베이스 데이터 삭제 (무조건 진행)
                 const videoRef = doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', currentEditingVideo.id);
                 await deleteDoc(videoRef);
 
-                alert("삭제되었습니다.");
+                alert("게시물이 성공적으로 정리되었습니다.");
                 location.reload();
             } catch (e) {
                 console.error(e);
-                alert("삭제 중 오류가 발생했습니다: " + e.message);
+                alert("삭제 중 치명적인 오류가 발생했습니다: " + e.message);
                 hideLoading();
             }
         };
