@@ -1,104 +1,523 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
-
-const VideoUploadModal = () => {
-  const [selectedThumbnail, setSelectedThumbnail] = useState(2);
-  const [category, setCategory] = useState('단기컷');
-  const [title, setTitle] = useState('');
-  const [author, setAuthor] = useState('');
-
-  // 썸네일 더미 데이터
-  const thumbnails = [
-    { id: 0, url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=200&h=120&fit=crop' },
-    { id: 1, url: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=200&h=120&fit=crop' },
-    { id: 2, url: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=200&h=120&fit=crop' },
-    { id: 3, url: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=200&h=120&fit=crop' },
-    { id: 4, url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=200&h=120&fit=crop' },
-  ];
-
-  // 드롭박스 옵션 목록
-  const categories = ['단기컷', '공략', '가이드', '기타'];
-
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900 p-4">
-      <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden p-10 relative">
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>옥튜브 - 아카이브</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; letter-spacing: -0.025em; }
+        .video-card { background: white; border-radius: 12px; overflow: hidden; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04); cursor: pointer; }
+        .video-card:hover { transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1); }
+        .thumb-option { border: 4px solid transparent; border-radius: 12px; cursor: pointer; transition: all 0.2; position: relative; overflow: hidden; }
+        .thumb-option.selected { border-color: #2563eb; transform: scale(1.05); z-index: 10; }
+        #player-modal, #admin-modal, #loading-overlay { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.85); }
+        iframe { background-color: #000; border: none; }
+        .admin-badge { display: none; }
+        body.is-admin .admin-badge { display: flex; }
+        body.is-admin .login-btn { display: none; }
         
-        {/* 헤더 및 닫기 버튼 */}
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-bold text-slate-800">새 영상 업로드</h2>
-          <button className="text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={28} />
-          </button>
-        </div>
+        /* Skeleton Animation for Loading */
+        .loading-skeleton {
+            background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+        }
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="text-slate-900">
 
-        {/* 안내 문구 */}
-        <div className="text-center mb-6">
-          <p className="text-blue-600 italic font-semibold">
-            썸네일을 선택하고 정보를 입력하세요
-          </p>
-        </div>
-
-        {/* 썸네일 선택 영역 */}
-        <div className="flex gap-2 justify-between mb-8 overflow-x-auto pb-2">
-          {thumbnails.map((thumb) => (
-            <div
-              key={thumb.id}
-              onClick={() => setSelectedThumbnail(thumb.id)}
-              className={`relative flex-shrink-0 cursor-pointer rounded-lg overflow-hidden border-4 transition-all ${
-                selectedThumbnail === thumb.id ? 'border-blue-500 scale-105' : 'border-transparent opacity-70 hover:opacity-100'
-              }`}
-              style={{ width: '110px', height: '65px' }}
-            >
-              <img src={thumb.url} alt="thumbnail" className="w-full h-full object-cover" />
+    <header class="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
+                <div class="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white">
+                    <i data-lucide="play" fill="currentColor" class="w-4 h-4 ml-0.5"></i>
+                </div>
+                <span class="font-extrabold text-lg tracking-tighter">옥튜브</span>
             </div>
-          ))}
+            <div class="flex items-center gap-2">
+                <div class="admin-badge items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-[10px] font-bold border border-blue-100">
+                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+                    관리자 인증됨
+                </div>
+                <button onclick="requestToken()" class="login-btn bg-slate-100 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:bg-slate-200 transition-colors">관리자 로그인</button>
+                <button onclick="openAdmin()" class="bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-slate-800 transition-colors">영상 등록</button>
+            </div>
         </div>
+    </header>
 
-        {/* 입력 폼 영역 */}
-        <div className="space-y-4">
-          {/* 영상 제목 */}
-          <input
-            type="text"
-            placeholder="영상 제목"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-slate-50 border-none rounded-xl py-4 px-6 text-lg focus:ring-2 focus:ring-blue-400 outline-none transition-all placeholder-gray-300"
-          />
-
-          <div className="flex gap-4">
-            {/* 카테고리 드롭박스 (수정된 부분) */}
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="flex-1 bg-slate-50 border-none rounded-xl py-4 px-6 text-lg focus:ring-2 focus:ring-blue-400 outline-none transition-all appearance-none cursor-pointer"
-              style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 24 24%27 stroke=%27currentColor%27%3E%3Cpath stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%272%27 d=%2719 9l-7 7-7-7%27 /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1.5rem center', backgroundSize: '1.5rem' }}
-            >
-              {categories.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-
-            {/* 작성자 */}
-            <input
-              type="text"
-              placeholder="작성자"
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              className="flex-1 bg-slate-50 border-none rounded-xl py-4 px-6 text-lg focus:ring-2 focus:ring-blue-400 outline-none transition-all placeholder-gray-300"
-            />
-          </div>
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <div id="video-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
+            <!-- 영상 목록 로드 영역 -->
         </div>
+    </main>
 
-        {/* 등록 버튼 */}
-        <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 rounded-xl mt-10 text-xl transition-all shadow-lg active:scale-[0.98]">
-          구글 드라이브 업로드 및 등록
-        </button>
+    <!-- 업로드/수정 모달 -->
+    <div id="admin-modal" class="fixed inset-0 z-[1100] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-3xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="modal-title" class="text-2xl font-bold">새 영상 업로드</h2>
+                <button onclick="closeAdmin()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div id="upload-step-1" class="space-y-6">
+                <div class="border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center hover:border-blue-500 transition-colors">
+                    <input type="file" id="video-input" accept="video/*" class="hidden" onchange="handleFileSelect(event)">
+                    <label for="video-input" class="cursor-pointer block">
+                        <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                        </div>
+                        <p class="text-slate-600 font-bold">영상 파일을 선택하세요</p>
+                    </label>
+                </div>
+            </div>
 
-      </div>
+            <div id="upload-step-2" class="hidden space-y-6">
+                <div class="text-center">
+                    <p id="step-2-guide" class="text-sm font-bold mb-4 italic text-blue-600">썸네일을 선택하고 정보를 입력하세요</p>
+                    <div id="thumbnail-container" class="grid grid-cols-5 gap-2 mb-6"></div>
+                    <div class="space-y-3 text-left">
+                        <input id="input-title" type="text" placeholder="영상 제목" class="w-full px-4 py-3 bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="grid grid-cols-2 gap-3">
+                            <select id="input-category" class="w-full px-4 py-3 bg-slate-100 rounded-xl outline-none">
+                                <option value="단기컷">단기컷</option>
+                                <option value="공략">공략</option>
+                            </select>
+                            <input id="input-author" type="text" placeholder="작성자" class="w-full px-4 py-3 bg-slate-100 rounded-xl outline-none">
+                        </div>
+                    </div>
+                    <button id="final-action-btn" onclick="handleFinalAction()" class="w-full py-4 bg-blue-600 text-white font-bold rounded-xl mt-6 shadow-lg hover:bg-blue-700 transition-all">
+                        구글 드라이브 업로드 및 등록
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-  );
-};
 
-export default App = VideoUploadModal;
+    <!-- 로딩 오버레이 -->
+    <div id="loading-overlay" class="fixed inset-0 z-[2000] hidden flex-col items-center justify-center text-white text-center">
+        <div id="spinner" class="w-12 h-12 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+        <p id="loading-text" class="font-bold mb-4 px-6 text-lg"></p>
+        <div id="progress-container" class="w-64 h-2 bg-white/20 rounded-full overflow-hidden hidden">
+            <div id="progress-bar" class="h-full bg-blue-500 w-0 transition-all duration-300"></div>
+        </div>
+    </div>
+
+    <!-- 플레이어 모달 -->
+    <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
+        <div class="w-full max-w-5xl" onclick="event.stopPropagation()">
+            <div id="video-frame" class="bg-black rounded-3xl overflow-hidden aspect-video shadow-2xl relative">
+                <div id="iframe-loader" class="absolute inset-0 z-0 loading-skeleton flex items-center justify-center">
+                    <p class="text-white/40 text-sm font-bold animate-pulse">영상을 불러오는 중...</p>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-col items-center gap-4">
+                <div class="flex items-center gap-6">
+                    <button onclick="closePlayer()" class="text-white/70 hover:text-white flex items-center gap-2 transition-colors font-bold group">
+                        <i data-lucide="x-circle" class="group-hover:scale-110 transition-transform"></i> 플레이어 닫기
+                    </button>
+                    <div class="admin-badge items-center gap-4">
+                        <button onclick="openEditMode()" class="text-blue-400 hover:text-blue-300 flex items-center gap-2 transition-colors font-bold group">
+                            <i data-lucide="edit-3" class="group-hover:rotate-12 transition-transform"></i> 정보 수정
+                        </button>
+                        <div class="w-px h-4 bg-white/20"></div>
+                        <button onclick="deleteVideo()" class="text-rose-500 hover:text-rose-400 flex items-center gap-2 transition-colors font-bold group">
+                            <i data-lucide="trash-2" class="group-hover:scale-110 transition-transform"></i> 영상 삭제
+                        </button>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <p class="text-white/30 text-[10px]">영상이 계속 로딩 중이라면 구글 드라이브 폴더의 공개 권한 설정을 확인해 주세요.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+        const CLIENT_ID = '131660349524-lfu2c56t4ent6167fu68essbleoquptp.apps.googleusercontent.com';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAjbApqAPhrZXcnR2P_xd-nvrZOvZp67CI",
+            authDomain: "octopath-85851.firebaseapp.com",
+            projectId: "octopath-85851",
+            storageBucket: "octopath-85851.firebasestorage.app",
+            messagingSenderId: "744016190979",
+            appId: "1:744016190979:web:fbc5badeda2e24f5f47836"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const targetCollection = collection(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos');
+
+        let selectedFile, selectedThumb, tokenClient, accessToken;
+        let currentEditingVideo = null; 
+
+        window.onload = async () => {
+            try {
+                await signInAnonymously(auth);
+                loadVideos();
+                initGoogleAuth();
+                
+                const savedToken = sessionStorage.getItem('gdrive_token');
+                if (savedToken) {
+                    accessToken = savedToken;
+                    document.body.classList.add('is-admin');
+                }
+            } catch (e) { console.error("Firebase Auth Fail", e); }
+        };
+
+        function initGoogleAuth() {
+            if (typeof google !== 'undefined') {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: (resp) => {
+                        if (resp.error) return;
+                        accessToken = resp.access_token;
+                        sessionStorage.setItem('gdrive_token', accessToken);
+                        document.body.classList.add('is-admin');
+                        
+                        if (document.getElementById('admin-modal').classList.contains('flex') && selectedFile) {
+                            startProcess();
+                        } else {
+                            alert("관리자 인증이 완료되었습니다.");
+                        }
+                    },
+                });
+            }
+        }
+
+        function loadVideos() {
+            onSnapshot(targetCollection, (snap) => {
+                const grid = document.getElementById('video-grid');
+                const videos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                                    .sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                
+                if (videos.length === 0) {
+                    grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-400 font-bold">등록된 영상이 없습니다.</div>`;
+                    return;
+                }
+
+                grid.innerHTML = videos.map(v => `
+                    <div class="video-card" onclick="openPlayer('${v.fileId}', '${v.id}', ${JSON.stringify(v).replace(/"/g, '&quot;')})">
+                        <div class="relative aspect-video bg-slate-200">
+                            <img src="${v.thumbnail}" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-all">
+                                <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                                    <i data-lucide="play" fill="currentColor" class="w-4 h-4 ml-1 text-blue-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-[10px] font-bold text-blue-600 uppercase">${v.category}</p>
+                            </div>
+                            <h3 class="font-bold text-sm truncate text-slate-800">${v.title}</h3>
+                            <p class="text-[10px] text-slate-400 mt-1">${v.author || '익명'}</p>
+                        </div>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            });
+        }
+
+        window.handleFileSelect = async (e) => {
+            selectedFile = e.target.files[0];
+            if (!selectedFile) return;
+
+            showLoading("썸네일을 추출하고 있습니다...");
+            const videoUrl = URL.createObjectURL(selectedFile);
+            const video = document.createElement('video');
+            video.src = videoUrl;
+            video.muted = true;
+            
+            video.onloadedmetadata = async () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const thumbs = [];
+                const points = [0.1, 0.3, 0.5, 0.7, 0.9];
+                
+                for (let t of points) {
+                    video.currentTime = t * video.duration;
+                    await new Promise(r => {
+                        const seeked = () => {
+                            video.removeEventListener('seeked', seeked);
+                            setTimeout(r, 1000); 
+                        };
+                        video.addEventListener('seeked', seeked);
+                    });
+                    canvas.width = 640; canvas.height = 360;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    thumbs.push(canvas.toDataURL('image/jpeg', 0.8));
+                }
+
+                document.getElementById('upload-step-1').classList.add('hidden');
+                document.getElementById('upload-step-2').classList.remove('hidden');
+                document.getElementById('thumbnail-container').innerHTML = thumbs.map((src, i) => `
+                    <div class="thumb-option ${i===2?'selected':''}" onclick="selectThumb(this, '${src}')">
+                        <img src="${src}" class="w-full aspect-video object-cover rounded-lg">
+                    </div>
+                `).join('');
+                selectedThumb = thumbs[2];
+                hideLoading();
+                URL.revokeObjectURL(videoUrl);
+            };
+        };
+
+        window.selectThumb = (el, src) => {
+            document.querySelectorAll('.thumb-option').forEach(t => t.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedThumb = src;
+        };
+
+        window.handleFinalAction = () => {
+            if (!selectedThumb || !document.getElementById('input-title').value) {
+                alert("제목을 입력하고 썸네일을 선택해주세요.");
+                return;
+            }
+
+            if (currentEditingVideo) {
+                updateExistingVideo();
+            } else {
+                startProcessWithCheck();
+            }
+        };
+
+        window.startProcessWithCheck = () => {
+            if (accessToken) {
+                startProcess();
+            } else {
+                tokenClient.requestAccessToken({ prompt: '' });
+            }
+        };
+
+        window.requestToken = () => {
+            tokenClient.requestAccessToken({ prompt: 'select_account' });
+        };
+
+        async function startProcess() {
+            showLoading("구글 드라이브에 영상 전송 중...", true);
+            try {
+                const folderId = await findOrCreateFolder('octo_media');
+                const fileId = await uploadFile(folderId);
+                await saveToFirestore(fileId);
+                
+                alert("성공적으로 등록되었습니다!");
+                location.reload();
+            } catch (err) {
+                console.error(err);
+                if (err.status === 401) {
+                    accessToken = null;
+                    sessionStorage.removeItem('gdrive_token');
+                    alert("인증이 만료되었습니다. 다시 로그인해 주세요.");
+                    tokenClient.requestAccessToken({ prompt: '' });
+                } else {
+                    alert("등록 중 오류: " + err.message);
+                }
+                hideLoading();
+            }
+        }
+
+        async function updateExistingVideo() {
+            showLoading("정보를 수정하는 중...");
+            try {
+                const videoRef = doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', currentEditingVideo.id);
+                await updateDoc(videoRef, {
+                    title: document.getElementById('input-title').value,
+                    category: document.getElementById('input-category').value,
+                    author: document.getElementById('input-author').value || '익명',
+                    thumbnail: selectedThumb
+                });
+                alert("수정이 완료되었습니다.");
+                location.reload();
+            } catch (e) {
+                console.error(e);
+                alert("수정 실패: " + e.message);
+                hideLoading();
+            }
+        }
+
+        async function findOrCreateFolder(name) {
+            const q = encodeURIComponent(`name = '${name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            if (res.status === 401) throw { status: 401, message: 'Unauthorized' };
+            const data = await res.json();
+            if (data.files && data.files.length > 0) return data.files[0].id;
+            const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' })
+            });
+            const folder = await createRes.json();
+            return folder.id;
+        }
+
+        async function uploadFile(folderId) {
+            const metadata = { name: selectedFile.name, parents: [folderId] };
+            const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(metadata)
+            });
+            if (res.status === 401) throw { status: 401, message: 'Unauthorized' };
+            const uploadUrl = res.headers.get('Location');
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('PUT', uploadUrl, true);
+                xhr.upload.onprogress = (e) => {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    document.getElementById('progress-bar').style.width = pct + '%';
+                    document.getElementById('loading-text').innerText = `전송 중: ${pct}%`;
+                };
+                xhr.onload = () => {
+                    if (xhr.status === 200 || xhr.status === 201) resolve(JSON.parse(xhr.response).id);
+                    else reject(new Error("드라이브 전송 실패"));
+                };
+                xhr.onerror = () => reject(new Error("네트워크 오류"));
+                xhr.send(selectedFile);
+            });
+        }
+
+        async function saveToFirestore(fileId) {
+            showLoading("목록 업데이트 중...");
+            await addDoc(targetCollection, {
+                fileId: fileId,
+                thumbnail: selectedThumb,
+                title: document.getElementById('input-title').value,
+                category: document.getElementById('input-category').value,
+                author: document.getElementById('input-author').value || '익명',
+                timestamp: serverTimestamp()
+            });
+        }
+
+        window.openPlayer = (fileId, docId, videoData) => {
+            currentEditingVideo = { id: docId, ...videoData };
+            const embedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+            const loader = document.getElementById('iframe-loader');
+            loader.style.display = 'flex';
+            
+            const iframe = document.createElement('iframe');
+            iframe.src = embedUrl;
+            iframe.className = "w-full h-full relative z-10";
+            iframe.allow = "autoplay";
+            iframe.setAttribute('frameborder', '0');
+            iframe.onload = () => { loader.style.display = 'none'; };
+            
+            document.getElementById('video-frame').appendChild(iframe);
+            document.getElementById('player-modal').classList.replace('hidden', 'flex');
+        };
+
+        window.closePlayer = () => {
+            const frame = document.getElementById('video-frame');
+            const iframes = frame.getElementsByTagName('iframe');
+            while(iframes.length > 0) frame.removeChild(iframes[0]);
+            document.getElementById('player-modal').classList.replace('flex', 'hidden');
+            currentEditingVideo = null;
+        };
+
+        window.openEditMode = () => {
+            if (!currentEditingVideo) return;
+            
+            const modal = document.getElementById('admin-modal');
+            document.getElementById('modal-title').innerText = "영상 정보 수정";
+            document.getElementById('upload-step-1').classList.add('hidden');
+            document.getElementById('upload-step-2').classList.remove('hidden');
+            document.getElementById('step-2-guide').innerText = "기존 썸네일을 유지하거나 새로운 정보를 입력하세요.";
+            document.getElementById('final-action-btn').innerText = "수정 완료";
+
+            document.getElementById('input-title').value = currentEditingVideo.title;
+            document.getElementById('input-category').value = currentEditingVideo.category;
+            document.getElementById('input-author').value = currentEditingVideo.author;
+            selectedThumb = currentEditingVideo.thumbnail;
+
+            document.getElementById('thumbnail-container').innerHTML = `
+                <div class="thumb-option selected col-span-2">
+                    <img src="${selectedThumb}" class="w-full aspect-video object-cover rounded-lg">
+                </div>
+                <div class="col-span-3 flex items-center px-4 text-xs text-slate-400 italic">
+                    수정 모드에서는 썸네일 변경을 지원하지 않습니다. (삭제 후 재등록 권장)
+                </div>
+            `;
+
+            modal.classList.replace('hidden', 'flex');
+        };
+
+        window.deleteVideo = async () => {
+            if (!currentEditingVideo) return;
+            if (!confirm(`[${currentEditingVideo.title}] 게시물을 정말 삭제할까요?\n데이터베이스와 드라이브 파일이 정리됩니다.`)) return;
+
+            showLoading("데이터 정리 중...");
+            try {
+                if (accessToken && currentEditingVideo.fileId) {
+                    try {
+                        const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files/${currentEditingVideo.fileId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        if (!driveRes.ok && driveRes.status !== 404) {
+                            console.warn("Google Drive deletion non-critical error:", driveRes.status);
+                        }
+                    } catch (driveErr) {
+                        console.error("Drive file might already be gone or invalid:", driveErr);
+                    }
+                }
+
+                const videoRef = doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', currentEditingVideo.id);
+                await deleteDoc(videoRef);
+
+                alert("게시물이 성공적으로 정리되었습니다.");
+                location.reload();
+            } catch (e) {
+                console.error(e);
+                alert("삭제 중 치명적인 오류가 발생했습니다: " + e.message);
+                hideLoading();
+            }
+        };
+
+        window.openAdmin = () => {
+            currentEditingVideo = null;
+            document.getElementById('modal-title').innerText = "새 영상 업로드";
+            document.getElementById('upload-step-1').classList.remove('hidden');
+            document.getElementById('upload-step-2').classList.add('hidden');
+            document.getElementById('final-action-btn').innerText = "구글 드라이브 업로드 및 등록";
+            
+            document.getElementById('input-title').value = "";
+            document.getElementById('input-author').value = "";
+            
+            document.getElementById('admin-modal').classList.replace('hidden', 'flex');
+        };
+
+        window.closeAdmin = () => {
+            if (currentEditingVideo) {
+                document.getElementById('admin-modal').classList.replace('flex', 'hidden');
+            } else {
+                location.reload();
+            }
+        };
+
+        function showLoading(t, p = false) {
+            document.getElementById('loading-text').innerText = t;
+            document.getElementById('loading-overlay').classList.replace('hidden', 'flex');
+            document.getElementById('progress-container').classList.toggle('hidden', !p);
+        }
+        function hideLoading() { document.getElementById('loading-overlay').classList.replace('flex', 'hidden'); }
+
+        window.addEventListener('keydown', (e) => { if(e.key === 'Escape') closePlayer(); });
+    </script>
+</body>
+</html>
