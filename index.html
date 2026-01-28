@@ -15,7 +15,7 @@
         .video-card { background: white; border-radius: 16px; overflow: hidden; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); cursor: pointer; border: 1px solid #f1f5f9; }
         .video-card:hover { transform: translateY(-6px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-color: #e2e8f0; }
         
-        /* 플로팅 배너 (작성자) */
+        /* 플로팅 배너 (작성자) - 데스크탑 기본 */
         .author-badge {
             position: absolute; top: 10px; left: 10px; background-color: #ff5a5a; color: white;
             padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 4px;
@@ -29,9 +29,15 @@
 
         /* 모바일 환경 최적화 (768px 이하) */
         @media (max-width: 768px) {
-            /* 플로팅 배너 크기 축소 */
-            .author-badge { top: 5px; left: 5px; padding: 2px 6px; font-size: 8px; gap: 2px; }
-            .author-badge i { width: 8px !important; height: 8px !important; }
+            /* 플로팅 배너 위치 및 사이즈 정밀 조정 */
+            .author-badge { 
+                top: 8px; /* 위쪽 여백 확보 */
+                left: 8px; /* 왼쪽 여백 확보 */
+                padding: 1.5px 5px; /* 사이즈 축소 */
+                font-size: 7.5px; /* 폰트 미세 축소 */
+                gap: 2px; 
+            }
+            .author-badge i { width: 7px !important; height: 7px !important; }
             
             /* 제목 텍스트 크기 축소 */
             .video-title { font-size: 0.85rem; line-height: 1.2; letter-spacing: -0.04em; }
