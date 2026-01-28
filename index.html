@@ -186,9 +186,10 @@
         </div>
     </div>
 
-    <div id="loading-overlay" class="fixed inset-0 z-[2000] hidden flex-col items-center justify-center text-white">
+    <div id="loading-overlay" class="fixed inset-0 z-[2000] hidden flex-col items-center justify-center text-white text-center p-6">
         <div class="w-14 h-14 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mb-6"></div>
         <p id="loading-text" class="font-extrabold text-xl"></p>
+        <p id="loading-sub" class="text-slate-300 text-sm mt-2"></p>
     </div>
 
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
@@ -213,9 +214,11 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
+        // Google API 설정
         const CLIENT_ID = '131660349524-lfu2c56t4ent6167fu68essbleoquptp.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
+        // Firebase 설정
         const firebaseConfig = {
             apiKey: "AIzaSyAjbApqAPhrZXcnR2P_xd-nvrZOvZp67CI",
             authDomain: "octopath-85851.firebaseapp.com",
@@ -365,13 +368,13 @@
         window.requestToken = () => { tokenClient.requestAccessToken({ prompt: 'select_account' }); };
 
         async function startProcess() {
-            showLoading("파일 업로드 준비 중...");
+            showLoading("파일 업로드 준비 중...", "구글 드라이브 폴더를 확인하고 있습니다.");
             try {
                 const folderId = await findOrCreateFolder('octo_media');
-                showLoading("파일 업로드 중...");
+                showLoading("파일 업로드 중...", "대용량 파일의 경우 시간이 걸릴 수 있습니다.");
                 const fileId = await uploadFileToDrive(folderId);
                 
-                showLoading("데이터베이스 등록 중...");
+                showLoading("데이터베이스 등록 중...", "거의 다 되었습니다!");
                 await addDoc(targetCollection, {
                     fileId, thumbnail: selectedThumb,
                     title: document.getElementById('input-title').value,
@@ -383,23 +386,10 @@
                 hideLoading();
                 location.reload();
             } catch (err) { 
-                console.error(err);
-                alert("업로드 중 오류가 발생했습니다: " + err.message); 
+                console.error("Upload Error:", err);
+                alert("업로드 실패: " + err.message + "\n\n콘솔 창(F12)에서 자세한 에러를 확인하세요."); 
                 hideLoading(); 
             }
-        }
-
-        async function updateExistingVideo() {
-            showLoading("정보 수정 중...");
-            try {
-                await updateDoc(doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', currentEditingVideo.id), {
-                    title: document.getElementById('input-title').value,
-                    category: document.getElementById('input-category').value,
-                    author: document.getElementById('input-author').value || '익명',
-                    thumbnail: selectedThumb
-                });
-                location.reload();
-            } catch (e) { alert("오류: " + e.message); hideLoading(); }
         }
 
         async function findOrCreateFolder(name) {
@@ -419,38 +409,55 @@
             return folderData.id;
         }
 
+        /**
+         * 구글 드라이브 Resumable 업로드 핵심 로직
+         */
         async function uploadFileToDrive(folderId) {
-            const metadata = { name: selectedFile.name, parents: [folderId] };
+            const metadata = { 
+                name: selectedFile.name, 
+                parents: [folderId],
+                mimeType: selectedFile.type || 'video/mp4'
+            };
             
-            // 1. Resumable Upload URL 요청
-            const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+            // 1. 업로드 세션 생성
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
                 method: 'POST', 
                 headers: { 
                     'Authorization': `Bearer ${accessToken}`, 
-                    'Content-Type': 'application/json' 
+                    'Content-Type': 'application/json; charset=UTF-8',
+                    'X-Upload-Content-Type': selectedFile.type || 'video/mp4',
+                    'X-Upload-Content-Length': selectedFile.size
                 },
                 body: JSON.stringify(metadata)
             });
 
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(`메타데이터 업로드 실패: ${errorData.error?.message || res.statusText}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`업로드 세션 생성 실패 (${response.status}): ${errorText}`);
             }
 
-            // 2. Location 헤더에서 업로드 URL 추출
-            const uploadUrl = res.headers.get('Location');
+            // 2. Location 헤더 추출
+            // fetch는 기본적으로 Location 헤더를 볼 수 있어야 함 (Google API는 Expose-Headers를 제공함)
+            const uploadUrl = response.headers.get('Location');
+            
             if (!uploadUrl) {
-                throw new Error("업로드 URL(Location 헤더)을 가져오지 못했습니다. 구글 API 응답 형식을 확인하세요.");
+                // Location 헤더를 직접 읽지 못할 경우의 폴백 및 상세 에러
+                console.error("Headers received:", [...response.headers.entries()]);
+                throw new Error("업로드 URL(Location) 헤더를 읽을 수 없습니다. 브라우저 보안 정책이나 네트워크를 확인하세요.");
             }
 
-            // 3. 실제 파일 데이터 업로드
+            // 3. 실제 파일 데이터 전송 (PUT)
             const uploadRes = await fetch(uploadUrl, { 
                 method: 'PUT', 
+                headers: {
+                    'Content-Type': selectedFile.type || 'video/mp4'
+                },
                 body: selectedFile 
             });
 
             if (!uploadRes.ok) {
-                throw new Error("파일 데이터 전송 실패");
+                const errorText = await uploadRes.text();
+                throw new Error(`파일 데이터 전송 실패 (${uploadRes.status}): ${errorText}`);
             }
 
             const finalData = await uploadRes.json();
@@ -505,7 +512,12 @@
             document.getElementById('admin-modal').classList.replace('hidden', 'flex');
         };
         window.closeAdmin = () => document.getElementById('admin-modal').classList.replace('flex', 'hidden');
-        function showLoading(t) { document.getElementById('loading-text').innerText = t; document.getElementById('loading-overlay').classList.replace('hidden', 'flex'); }
+        
+        function showLoading(t, sub = "") { 
+            document.getElementById('loading-text').innerText = t; 
+            document.getElementById('loading-sub').innerText = sub; 
+            document.getElementById('loading-overlay').classList.replace('hidden', 'flex'); 
+        }
         function hideLoading() { document.getElementById('loading-overlay').classList.replace('flex', 'hidden'); }
     </script>
 </body>
