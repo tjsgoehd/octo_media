@@ -28,9 +28,11 @@
         .thumb-option.selected { border-color: #2563eb; transform: scale(1.05); z-index: 10; }
         
         #player-modal, #admin-modal, #loading-overlay { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.85); }
-        .admin-badge { display: none; }
-        body.is-admin .admin-badge { display: flex; }
-        body.is-admin .login-btn { display: none; }
+        
+        /* 관리자 전용 요소 제어 */
+        .admin-only { display: none !important; }
+        body.is-admin .admin-only { display: flex !important; }
+        body.is-admin .login-btn { display: none !important; }
         
         .filter-btn { transition: all 0.2s; background: white; color: #64748b; border: 1px solid #f1f5f9; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .filter-btn.active { background-color: #2563eb; color: white; border-color: #2563eb; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
@@ -53,12 +55,14 @@
                 <span class="font-extrabold text-xl tracking-tighter text-slate-900">옥튜브</span>
             </div>
             <div class="flex items-center gap-3">
-                <div class="admin-badge items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-[11px] font-bold border border-blue-100">
-                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-                    ADMIN
-                </div>
+                <!-- 로그아웃 버튼 (관리자일 때만 노출) -->
+                <button onclick="handleLogout()" class="admin-only items-center gap-2 bg-rose-50 text-rose-600 px-4 py-2.5 rounded-full text-[11px] font-bold border border-rose-100 hover:bg-rose-100 transition-colors">
+                    <span class="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span>
+                    로그아웃
+                </button>
                 <button onclick="requestToken(true)" class="login-btn bg-slate-100 text-slate-600 px-5 py-2.5 rounded-full text-xs font-bold hover:bg-slate-200 transition-colors">관리자 로그인</button>
-                <button onclick="openAdmin()" class="bg-blue-600 text-white px-5 py-2.5 rounded-full text-xs font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">영상 등록</button>
+                <!-- 영상 등록 버튼 (관리자일 때만 노출) -->
+                <button onclick="openAdmin()" class="admin-only bg-blue-600 text-white px-5 py-2.5 rounded-full text-xs font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">영상 등록</button>
             </div>
         </div>
     </header>
@@ -152,10 +156,9 @@
             </div>
             <div class="mt-8 flex justify-center gap-4">
                 <button onclick="closePlayer()" class="text-white bg-white/10 px-8 py-3 rounded-full font-bold hover:bg-white/20 transition-colors backdrop-blur-md">닫기</button>
-                <div class="admin-badge items-center gap-4">
-                    <button onclick="openEditMode()" class="text-blue-400 bg-blue-400/10 px-8 py-3 rounded-full font-bold hover:bg-blue-400/20 transition-colors backdrop-blur-md">정보 수정</button>
-                    <button onclick="deleteVideo()" class="text-rose-500 bg-rose-500/10 px-8 py-3 rounded-full font-bold hover:bg-rose-500/20 transition-colors backdrop-blur-md">삭제</button>
-                </div>
+                <!-- 수정 및 삭제 버튼 (관리자일 때만 노출) -->
+                <button onclick="openEditMode()" class="admin-only text-blue-400 bg-blue-400/10 px-8 py-3 rounded-full font-bold hover:bg-blue-400/20 transition-colors backdrop-blur-md">정보 수정</button>
+                <button onclick="deleteVideo()" class="admin-only text-rose-500 bg-rose-500/10 px-8 py-3 rounded-full font-bold hover:bg-rose-500/20 transition-colors backdrop-blur-md">삭제</button>
             </div>
         </div>
     </div>
@@ -194,6 +197,13 @@
                 await signInAnonymously(auth);
                 loadVideos();
                 initGoogleAuth();
+                
+                // 세션 복구 시도 (기존 토큰이 있다면 관리자 모드 활성화)
+                const savedToken = sessionStorage.getItem('drive_token');
+                if (savedToken) {
+                    accessToken = savedToken;
+                    document.body.classList.add('is-admin');
+                }
             } catch (e) { console.error(e); }
         };
 
@@ -208,6 +218,7 @@
                             return;
                         }
                         accessToken = resp.access_token;
+                        sessionStorage.setItem('drive_token', accessToken);
                         document.body.classList.add('is-admin');
                         if (pendingProcess) {
                             pendingProcess = false;
@@ -217,6 +228,16 @@
                 });
             }
         }
+
+        window.handleLogout = () => {
+            if(confirm("관리자 모드에서 로그아웃하시겠습니까?")) {
+                accessToken = null;
+                sessionStorage.removeItem('drive_token');
+                document.body.classList.remove('is-admin');
+                closePlayer();
+                closeAdmin();
+            }
+        };
 
         function loadVideos() {
             onSnapshot(targetCollection, (snap) => {
@@ -283,10 +304,12 @@
         window.selectThumb = (el, src) => { document.querySelectorAll('.thumb-option').forEach(t => t.classList.remove('selected')); el.classList.add('selected'); selectedThumb = src; };
 
         window.handleFinalAction = () => {
-            if (!selectedThumb || !document.getElementById('input-title').value) return alert("정보를 모두 입력해주세요.");
-            if (currentEditingVideo) updateExistingVideo(); 
-            else {
-                // 토큰이 없거나 유효하지 않으면 요청, 있으면 바로 실행
+            const title = document.getElementById('input-title').value.trim();
+            if (!selectedThumb || !title) return alert("정보를 모두 입력해주세요.");
+            
+            if (currentEditingVideo) {
+                updateExistingVideo(); 
+            } else {
                 if (!accessToken) {
                     pendingProcess = true;
                     tokenClient.requestAccessToken({ prompt: '' });
@@ -295,6 +318,18 @@
                 }
             }
         };
+
+        async function updateExistingVideo() {
+            showLoading("정보 수정 중...");
+            try {
+                await updateDoc(doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', currentEditingVideo.id), {
+                    title: document.getElementById('input-title').value,
+                    category: document.getElementById('input-category').value,
+                    author: document.getElementById('input-author').value || '익명'
+                });
+                location.reload();
+            } catch (e) { alert("수정 실패"); hideLoading(); }
+        }
 
         window.requestToken = (interactive = false) => {
             tokenClient.requestAccessToken({ prompt: interactive ? 'select_account' : '' });
@@ -321,9 +356,10 @@
             } catch (err) { 
                 console.error("Process Error:", err);
                 if (err.status === 401) {
-                    accessToken = null; // 토큰 초기화
+                    accessToken = null;
+                    sessionStorage.removeItem('drive_token');
                     pendingProcess = true;
-                    tokenClient.requestAccessToken({ prompt: '' }); // 다시 요청
+                    tokenClient.requestAccessToken({ prompt: '' });
                 } else {
                     alert("업로드 실패: " + err.message);
                     hideLoading(); 
@@ -336,10 +372,7 @@
             const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}`, { 
                 headers: { 'Authorization': `Bearer ${accessToken}` } 
             });
-            if (!res.ok) {
-                const e = await res.json();
-                const err = new Error("Folder Search Failed"); err.status = res.status; throw err;
-            }
+            if (!res.ok) { const err = new Error("Folder Search Failed"); err.status = res.status; throw err; }
             const data = await res.json();
             if (data.files?.length > 0) return data.files[0].id;
             
@@ -361,14 +394,8 @@
                 body: JSON.stringify(metadata)
             });
 
-            if (!response.ok) {
-                const e = await response.json();
-                const err = new Error(e.error.message); err.status = response.status; throw err;
-            }
-
+            if (!response.ok) { const e = await response.json(); const err = new Error(e.error.message); err.status = response.status; throw err; }
             const uploadUrl = response.headers.get('Location');
-            if (!uploadUrl) throw new Error("업로드 주소를 받지 못했습니다. CORS 설정을 확인하세요.");
-
             const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: selectedFile });
             if (!uploadRes.ok) throw new Error("파일 전송 실패");
             const finalData = await uploadRes.json();
@@ -405,13 +432,22 @@
         };
 
         window.deleteVideo = async () => {
-            if (!confirm("삭제하시겠습니까?")) return;
+            if (!confirm("정말로 이 영상을 삭제하시겠습니까? 구글 드라이브 파일도 함께 삭제됩니다.")) return;
             showLoading("삭제 중...");
             try {
-                if (accessToken) await fetch(`https://www.googleapis.com/drive/v3/files/${currentEditingVideo.fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } });
+                if (accessToken) {
+                    await fetch(`https://www.googleapis.com/drive/v3/files/${currentEditingVideo.fileId}`, { 
+                        method: 'DELETE', 
+                        headers: { 'Authorization': `Bearer ${accessToken}` } 
+                    });
+                }
                 await deleteDoc(doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', currentEditingVideo.id));
                 location.reload();
-            } catch (e) { alert("삭제 실패"); hideLoading(); }
+            } catch (e) { 
+                console.error(e);
+                alert("삭제에 실패했습니다. 관리자 권한을 확인하세요."); 
+                hideLoading(); 
+            }
         };
 
         window.openAdmin = () => {
