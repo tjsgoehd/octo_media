@@ -3,203 +3,333 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>옥튜브 - 프리미엄 비디오 아카이브</title>
+    <title>OKTUBE PRO | Google Drive Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
-        
-        body { 
-            font-family: 'Pretendard', sans-serif; 
-            background-color: #f8fafc; 
-            letter-spacing: -0.025em;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* OTT 스타일 비디오 카드 */
-        .video-card { 
-            background: white; 
-            border-radius: 12px; 
-            overflow: hidden; 
-            transition: all 0.25s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-            display: flex;
-            flex-direction: column;
-        }
-        
-        /* 작성자 배지 스타일 (요청하신 image_905597.png 재현) */
-        .author-badge {
-            position: absolute;
-            top: 8px; /* 상단 여백 */
-            left: 8px; /* 좌측 여백 */
-            background-color: rgba(255, 95, 95, 0.95); /* 붉은색 톤 */
-            color: white;
-            padding: 3px 8px;
-            border-radius: 99px;
-            font-size: 10px;
-            font-weight: 800;
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            z-index: 20;
-            backdrop-filter: blur(4px);
-        }
-
-        .category-chip {
-            transition: all 0.2s;
-            border: 1px solid #e2e8f0;
-            background: white;
-        }
-        .category-chip.active {
-            background-color: #2563eb;
-            color: white;
-            border-color: #2563eb;
-        }
-
-        /* 플레이어 모달 애니메이션 */
-        #player-modal {
-            backdrop-filter: blur(15px);
-            background-color: rgba(0, 0, 0, 0.85);
-        }
-
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; letter-spacing: -0.02em; -webkit-tap-highlight-color: transparent; }
+        .glass-morphism { backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.9); border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .btn-gradient { background: linear-gradient(135deg, #2563eb, #1e40af); transition: all 0.3s ease; }
+        .btn-gradient:hover { transform: translateY(-2px); box-shadow: 0 10px 20px -10px rgba(37, 99, 235, 0.4); }
+        .btn-gradient:active { transform: scale(0.98); }
+        .loader { width: 36px; height: 36px; border: 4px solid #e2e8f0; border-bottom-color: #2563eb; border-radius: 50%; display: inline-block; animation: rotation 1s linear infinite; }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .video-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .video-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        
-        /* 모바일 텍스트 제한 */
-        .line-clamp-2 {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
     </style>
 </head>
-<body class="text-slate-900">
+<body class="text-slate-900 select-none">
 
-    <!-- 상단 헤더 -->
-    <header class="sticky top-0 z-[100] bg-white/90 backdrop-blur-md border-b border-slate-100">
-        <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-            <div class="flex items-center gap-2" onclick="location.reload()">
-                <div class="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-                    <i data-lucide="play" fill="currentColor" class="w-3.5 h-3.5 ml-0.5"></i>
-                </div>
-                <span class="font-extrabold text-base tracking-tighter">옥튜브</span>
+    <!-- 헤더 -->
+    <header class="sticky top-0 z-50 glass-morphism px-4 sm:px-8 h-20 flex items-center justify-between">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
+            <div class="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-blue-200 shadow-lg">
+                <i data-lucide="play" fill="currentColor" class="w-5 h-5 ml-1"></i>
             </div>
-            
-            <div class="flex items-center gap-2">
-                <button onclick="alert('업로드 기능은 관리자 페이지에서 가능합니다.')" class="bg-slate-900 text-white px-3 py-1.5 rounded-full text-[11px] font-bold">
-                    등록
-                </button>
-                <div class="flex items-center gap-1.5 border border-slate-200 px-2.5 py-1 rounded-full text-slate-500 text-[10px] font-bold bg-slate-50">
-                    <i data-lucide="user" class="w-3 h-3 text-slate-400"></i>
-                    <span>ADMIN</span>
-                </div>
+            <div class="flex flex-col">
+                <span class="font-black text-2xl tracking-tighter italic leading-none text-slate-900">OKTUBE <span class="text-blue-600">DRIVE</span></span>
+                <div id="admin-badge" class="hidden mt-0.5"><span class="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Administrator</span></div>
             </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <button id="upload-btn" onclick="openUploadModal()" class="hidden items-center gap-2 btn-gradient text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg">
+                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">영상 업로드</span>
+            </button>
+            <button id="auth-btn" onclick="handleAuth()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors">
+                <span id="auth-text">Login</span>
+            </button>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 py-6">
-        <!-- 메인 타이틀 -->
-        <div class="mb-6">
-            <h1 class="text-xl font-extrabold mb-1">🔥 지금 가장 핫한 콘텐츠</h1>
-            <p class="text-slate-400 text-xs font-medium">아카이브의 최신 영상을 확인하세요.</p>
-        </div>
+    <!-- 메인 컨텐츠 -->
+    <main class="max-w-7xl mx-auto px-4 py-10">
+        <!-- 카테고리 -->
+        <nav class="flex gap-2 overflow-x-auto pb-6 no-scrollbar mb-4">
+            <button onclick="filterCat('전체')" class="cat-btn active px-6 py-2.5 rounded-full text-sm font-bold bg-slate-900 text-white transition-all shadow-md">전체</button>
+            <button onclick="filterCat('단기컷')" class="cat-btn px-6 py-2.5 rounded-full text-sm font-bold bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">단기컷</button>
+            <button onclick="filterCat('공략')" class="cat-btn px-6 py-2.5 rounded-full text-sm font-bold bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">공략</button>
+            <button onclick="filterCat('기타')" class="cat-btn px-6 py-2.5 rounded-full text-sm font-bold bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">기타</button>
+        </nav>
 
-        <!-- 카테고리 필터 (스크롤 가능) -->
-        <div class="flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar pb-1">
-            <button onclick="filterCat('전체')" class="category-chip active px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap" data-cat="전체">전체</button>
-            <button onclick="filterCat('단기컷')" class="category-chip px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap" data-cat="단기컷">단기컷</button>
-            <button onclick="filterCat('공략')" class="category-chip px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap" data-cat="공략">공략</button>
-            <button onclick="filterCat('기타')" class="category-chip px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap" data-cat="기타">기타</button>
-        </div>
-
-        <!-- 영상 그리드: 모바일 grid-cols-2 적용 -->
-        <div id="video-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
-            <!-- 데이터 로딩 스켈레톤 -->
-            <div class="col-span-full py-20 text-center">
-                <div class="inline-block w-6 h-6 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+        <!-- 비디오 그리드 -->
+        <div id="video-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div class="col-span-full py-40 flex flex-col items-center justify-center text-slate-400">
+                <span class="loader mb-6"></span>
+                <p class="font-bold text-lg animate-pulse">드라이브 연결 중...</p>
             </div>
         </div>
     </main>
 
-    <!-- 플레이어 모달 -->
-    <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4">
-        <div class="w-full max-w-4xl flex flex-col gap-3">
-            <div class="flex items-center justify-between text-white px-1">
-                <div class="max-w-[80%]">
-                    <span id="p-cat" class="text-blue-400 text-[10px] font-black tracking-widest uppercase"></span>
-                    <h2 id="p-title" class="text-base font-bold truncate"></h2>
-                </div>
-                <button onclick="closePlayer()" class="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">
-                    <i data-lucide="x" class="w-5 h-5"></i>
+    <!-- 업로드 모달 -->
+    <div id="upload-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+        <div class="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden transform transition-all">
+            <!-- 로딩 오버레이 -->
+            <div id="progress-overlay" class="absolute inset-0 z-50 bg-white/98 hidden flex-col justify-center items-center px-10 text-center">
+                <div class="loader mb-6"></div>
+                <h3 class="text-2xl font-black text-slate-900" id="progress-text">인증 대기 중...</h3>
+                <p class="text-sm text-slate-500 mt-2 font-medium">구글 팝업이 뜨면 '계속'을 눌러 권한을 허용해 주세요.</p>
+            </div>
+            
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-2xl font-black text-slate-900">DRIVE UPLOAD</h2>
+                <button onclick="closeUploadModal()" class="w-10 h-10 hover:bg-slate-100 rounded-full flex items-center justify-center transition-colors">
+                    <i data-lucide="x" class="w-6 h-6 text-slate-400"></i>
                 </button>
             </div>
 
-            <div class="bg-black rounded-xl overflow-hidden shadow-2xl aspect-video w-full flex items-center justify-center relative border border-white/10">
-                <div id="video-frame" class="w-full h-full"></div>
+            <div class="space-y-5">
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-1">Video Title</label>
+                    <input id="v-title" type="text" placeholder="영상 제목 입력" class="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:bg-white focus:border-blue-500 outline-none font-bold transition-all">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-1">Category</label>
+                        <select id="v-category" class="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:bg-white focus:border-blue-500 outline-none font-bold appearance-none transition-all">
+                            <option value="단기컷">단기컷</option>
+                            <option value="공략">공략</option>
+                            <option value="기타" selected>기타</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-1">Author</label>
+                        <input id="v-author" type="text" placeholder="닉네임" class="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl focus:bg-white focus:border-blue-500 outline-none font-bold transition-all">
+                    </div>
+                </div>
+                
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-1">File to Drive</label>
+                    <input type="file" id="v-file" accept="video/*" class="hidden">
+                    <div onclick="document.getElementById('v-file').click()" class="border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-all group">
+                        <div class="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                            <i data-lucide="video" class="w-7 h-7 text-blue-500"></i>
+                        </div>
+                        <p id="file-label" class="text-sm font-bold text-slate-500 group-hover:text-blue-600">터치하여 영상 파일 선택</p>
+                        <p class="text-[10px] text-slate-400 mt-1">선택 즉시 구글 드라이브로 업로드됩니다</p>
+                    </div>
+                </div>
+                
+                <button onclick="handleDriveUpload()" class="w-full py-5 btn-gradient text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-200 mt-2">
+                    업로드 및 등록
+                </button>
             </div>
+        </div>
+    </div>
 
-            <button onclick="closePlayer()" class="w-full py-3 bg-white text-slate-900 font-bold rounded-xl text-sm">
-                목록으로 돌아가기
-            </button>
+    <!-- 로그인 모달 -->
+    <div id="login-modal" class="fixed inset-0 z-[200] hidden items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-xs text-center shadow-2xl">
+            <div class="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="shield-check" class="w-8 h-8 text-slate-900"></i>
+            </div>
+            <h3 class="text-2xl font-black mb-1">Admin Access</h3>
+            <p class="text-xs text-slate-400 mb-8 font-bold">tjsgoehd@gmail.com</p>
+            
+            <input id="login-pw" type="password" class="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl mb-4 text-center text-xl tracking-[0.5em] font-black focus:border-blue-500 outline-none transition-all" placeholder="••••">
+            
+            <div class="flex gap-2">
+                <button onclick="closeLoginModal()" class="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200">취소</button>
+                <button onclick="performLogin()" class="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black shadow-lg">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 비디오 플레이어 -->
+    <div id="player-modal" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/95 backdrop-blur-xl p-4">
+        <div class="w-full max-w-5xl flex flex-col gap-4">
+            <div class="flex justify-between items-center text-white px-2">
+                <h2 id="p-title" class="text-lg font-bold truncate"></h2>
+                <button onclick="closePlayer()" class="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+                <video id="main-player" class="w-full h-full" controls playsinline></video>
+            </div>
+            <div class="bg-white/10 rounded-2xl p-4 flex items-center gap-4 backdrop-blur-md border border-white/5">
+                <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold" id="p-avatar">?</div>
+                <div>
+                    <p id="p-author" class="text-white font-bold text-sm"></p>
+                    <p class="text-xs text-slate-400">Google Drive Streaming</p>
+                </div>
+            </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+        const CLIENT_ID = '131660349524-lfu2c56t4ent6167fu68essbleoquptp.apps.googleusercontent.com';
+        const FOLDER_ID = '12WN0Y1v5MhetMRAUEBFOOAR2NA5PWsJa';
+        const ADMIN_EMAIL = 'tjsgoehd@gmail.com';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAjbApqAPhrZXcnR2P_xd-nvrZOvZp67CI",
             authDomain: "octopath-85851.firebaseapp.com",
             projectId: "octopath-85851",
-            appId: "1:744016190979:web:fbc5badeda2e24f5f47836"
+            storageBucket: "octopath-85851.firebasestorage.app",
+            messagingSenderId: "744016190979",
+            appId: "1:744016190979:web:fbc5badeda2e24f5f47836",
         };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = 'octopath-85851';
+        const appId = 'oktube-drive-v1';
 
-        let videoData = [];
-        let currentFilter = '전체';
+        // 전역 변수 선언 수정
+        let allVideos = []; 
+        let currentCategory = '전체';
+        let isAdmin = false;
+        let tokenClient;
+        let accessToken = null;
 
-        onAuthStateChanged(auth, (user) => {
-            if (!user) { signInAnonymously(auth); return; }
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'videos'), (snap) => {
-                videoData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                render();
+        window.initGIS = () => {
+            if (typeof google !== 'undefined' && google.accounts) {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: (response) => {
+                        if (response.error) {
+                            alert("인증 오류: " + response.error);
+                            document.getElementById('progress-overlay').classList.add('hidden');
+                            return;
+                        }
+                        accessToken = response.access_token;
+                        performDriveUpload();
+                    },
+                });
+            }
+        };
+
+        window.onload = () => {
+            window.initGIS();
+            onAuthStateChanged(auth, (user) => {
+                isAdmin = (user && user.email === ADMIN_EMAIL);
+                updateUI();
+                fetchVideos();
             });
-        });
+            if(!auth.currentUser) signInAnonymously(auth).catch(() => {});
+            lucide.createIcons();
+        };
+
+        function updateUI() {
+            const upBtn = document.getElementById('upload-btn');
+            const adminBadge = document.getElementById('admin-badge');
+            const authText = document.getElementById('auth-text');
+            if (upBtn) upBtn.classList.toggle('hidden', !isAdmin);
+            if (adminBadge) adminBadge.classList.toggle('hidden', !isAdmin);
+            if (authText) authText.innerText = isAdmin ? "Logout" : "Login";
+        }
+
+        window.handleDriveUpload = () => {
+            const file = document.getElementById('v-file').files[0];
+            const title = document.getElementById('v-title').value;
+            if(!file || !title) return alert("필수 정보를 입력하세요.");
+            
+            document.getElementById('progress-overlay').classList.remove('hidden');
+            document.getElementById('progress-text').innerText = "구글 권한 확인 중...";
+            
+            if (tokenClient) {
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            } else {
+                alert("Google 인증 라이브러리가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+                document.getElementById('progress-overlay').classList.add('hidden');
+            }
+        };
+
+        async function performDriveUpload() {
+            const file = document.getElementById('v-file').files[0];
+            const title = document.getElementById('v-title').value;
+            const author = document.getElementById('v-author').value;
+            const category = document.getElementById('v-category').value;
+            const statusText = document.getElementById('progress-text');
+
+            try {
+                statusText.innerText = "드라이브로 전송 중...";
+                const metadata = { name: file.name, mimeType: file.type, parents: [FOLDER_ID] };
+                const formData = new FormData();
+                formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                formData.append('file', file);
+
+                const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + accessToken },
+                    body: formData
+                });
+                const fileData = await res.json();
+                const fileId = fileData.id;
+
+                statusText.innerText = "권한 설정 중...";
+                await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: 'viewer', type: 'anyone' })
+                });
+
+                statusText.innerText = "리스트 등록 중...";
+                const randomThumb = `https://picsum.photos/seed/${fileId}/640/360`;
+                
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'videos'), {
+                    title, 
+                    author: author || '관리자',
+                    category,
+                    url: `https://drive.google.com/uc?export=download&id=${fileId}`,
+                    thumbnail: randomThumb,
+                    createdAt: serverTimestamp()
+                });
+
+                alert("업로드 완료!");
+                location.reload();
+            } catch (err) {
+                alert("업로드 실패: " + err.message);
+                document.getElementById('progress-overlay').classList.add('hidden');
+            }
+        }
+
+        function fetchVideos() {
+            const vRef = collection(db, 'artifacts', appId, 'public', 'data', 'videos');
+            onSnapshot(vRef, (snap) => {
+                allVideos = snap.docs.map(doc => ({id: doc.id, ...doc.data()}))
+                                .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                render();
+            }, (error) => {
+                console.error("Firestore Error:", error);
+            });
+        }
 
         function render() {
             const grid = document.getElementById('video-grid');
-            const filtered = videoData.filter(v => currentFilter === '전체' || v.category === currentFilter);
+            if (!grid) return;
 
-            if (filtered.length === 0) {
-                grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-400 text-sm">영상이 없습니다.</div>`;
+            const filtered = currentCategory === '전체' ? allVideos : allVideos.filter(v => v.category === currentCategory);
+            
+            if(filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-40 text-center text-slate-300 font-bold text-lg">NO VIDEOS</div>`;
                 return;
             }
-
             grid.innerHTML = filtered.map(v => `
-                <div class="video-card group" onclick="openPlayer('${v.url}', '${v.title}', '${v.category}')">
-                    <div class="relative aspect-video bg-slate-100 overflow-hidden">
-                        <!-- 작성자 배지 (요청하신 스타일) -->
-                        <div class="author-badge">
-                            <i data-lucide="user" class="w-2.5 h-2.5" fill="currentColor"></i>
-                            <span>${v.author || '관리자'}</span>
+                <div class="video-card bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 cursor-pointer group" onclick="window.openPlayer('${v.url}', '${v.title.replace(/'/g, "\\'")}', '${v.author.replace(/'/g, "\\'")}')">
+                    <div class="aspect-video bg-slate-200 relative overflow-hidden">
+                        <img src="${v.thumbnail}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div class="w-12 h-12 bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center">
+                                <i data-lucide="play" class="text-white w-5 h-5 ml-1" fill="currentColor"></i>
+                            </div>
                         </div>
-                        
-                        <img src="${v.thumbnail || 'https://via.placeholder.com/400x225?text=No+Thumbnail'}" 
-                             class="w-full h-full object-cover group-active:scale-105 transition-transform" 
-                             onerror="this.src='https://via.placeholder.com/400x225?text=Error'">
+                        <span class="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-lg font-bold uppercase">${v.category}</span>
                     </div>
-                    <div class="p-3 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-[9px] font-bold text-blue-600 mb-1 block uppercase">${v.category}</span>
-                            <h3 class="font-bold text-slate-800 text-[13px] leading-snug line-clamp-2">${v.title}</h3>
-                        </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-slate-800 line-clamp-1 text-lg mb-1">${v.title}</h3>
+                        <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">${v.author}</p>
                     </div>
                 </div>
             `).join('');
@@ -207,43 +337,54 @@
         }
 
         window.filterCat = (cat) => {
-            currentFilter = cat;
-            document.querySelectorAll('.category-chip').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.cat === cat);
+            currentCategory = cat;
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                const isActive = btn.innerText === cat;
+                btn.className = `cat-btn whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all ${isActive ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`;
             });
             render();
         };
 
-        window.openPlayer = (url, title, cat) => {
-            const modal = document.getElementById('player-modal');
-            const frame = document.getElementById('video-frame');
+        window.handleAuth = () => isAdmin ? signOut(auth).then(()=>location.reload()) : document.getElementById('login-modal').classList.remove('hidden');
+        window.performLogin = async () => {
+            const pw = document.getElementById('login-pw').value;
+            try {
+                await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pw);
+                document.getElementById('login-modal').classList.add('hidden');
+            } catch { alert("로그인 실패"); }
+        };
+        
+        window.openUploadModal = () => document.getElementById('upload-modal').classList.remove('hidden');
+        window.closeUploadModal = () => document.getElementById('upload-modal').classList.add('hidden');
+        window.closeLoginModal = () => document.getElementById('login-modal').classList.add('hidden');
+        
+        window.openPlayer = (url, title, author) => {
             document.getElementById('p-title').innerText = title;
-            document.getElementById('p-cat').innerText = cat;
-
-            frame.innerHTML = `
-                <video id="main-video" controls autoplay playsinline class="w-full h-full object-contain bg-black">
-                    <source src="${url}" type="video/mp4">
-                    브라우저가 비디오를 지원하지 않습니다.
-                </video>
-            `;
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            document.body.style.overflow = 'hidden';
-            lucide.createIcons();
+            document.getElementById('p-author').innerText = author;
+            document.getElementById('p-avatar').innerText = author.charAt(0);
+            const video = document.getElementById('main-player');
+            video.src = url;
+            document.getElementById('player-modal').classList.remove('hidden');
+            document.getElementById('player-modal').classList.add('flex');
+            video.play();
         };
-
         window.closePlayer = () => {
-            const modal = document.getElementById('player-modal');
-            const video = document.getElementById('main-video');
-            if(video) video.pause();
-            document.getElementById('video-frame').innerHTML = '';
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            document.body.style.overflow = 'auto';
+            const video = document.getElementById('main-player');
+            video.pause();
+            video.src = "";
+            document.getElementById('player-modal').classList.add('hidden');
+            document.getElementById('player-modal').classList.remove('flex');
         };
 
-        lucide.createIcons();
+        const fileInput = document.getElementById('v-file');
+        if (fileInput) {
+            fileInput.onchange = (e) => {
+                if(e.target.files[0]) {
+                    document.getElementById('file-label').innerText = e.target.files[0].name;
+                    document.getElementById('file-label').classList.add('text-blue-600');
+                }
+            };
+        }
     </script>
 </body>
 </html>
