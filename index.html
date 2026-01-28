@@ -27,7 +27,7 @@
             animation: skeleton-loading 1.5s infinite;
         }
         @keyframes skeleton-loading {
-            0% { background-position: 200% 0; }
+            00% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
     </style>
@@ -125,10 +125,16 @@
                     <button onclick="closePlayer()" class="text-white/70 hover:text-white flex items-center gap-2 transition-colors font-bold group">
                         <i data-lucide="x-circle" class="group-hover:scale-110 transition-transform"></i> 플레이어 닫기
                     </button>
-                    <!-- 수정 버튼 추가 (관리자 전용 노출) -->
-                    <button id="edit-btn" onclick="openEditMode()" class="admin-badge text-blue-400 hover:text-blue-300 items-center gap-2 transition-colors font-bold group">
-                        <i data-lucide="edit-3" class="group-hover:rotate-12 transition-transform"></i> 정보 수정하기
-                    </button>
+                    <!-- 관리자 전용 버튼 그룹 -->
+                    <div class="admin-badge items-center gap-4">
+                        <button onclick="openEditMode()" class="text-blue-400 hover:text-blue-300 flex items-center gap-2 transition-colors font-bold group">
+                            <i data-lucide="edit-3" class="group-hover:rotate-12 transition-transform"></i> 정보 수정
+                        </button>
+                        <div class="w-px h-4 bg-white/20"></div>
+                        <button onclick="deleteVideo()" class="text-rose-500 hover:text-rose-400 flex items-center gap-2 transition-colors font-bold group">
+                            <i data-lucide="trash-2" class="group-hover:scale-110 transition-transform"></i> 영상 삭제
+                        </button>
+                    </div>
                 </div>
                 <div class="text-center">
                     <p class="text-white/30 text-[10px]">영상이 계속 로딩 중이라면 구글 드라이브 폴더의 공개 권한 설정을 확인해 주세요.</p>
@@ -140,7 +146,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
         const CLIENT_ID = '131660349524-lfu2c56t4ent6167fu68essbleoquptp.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -160,7 +166,7 @@
         const targetCollection = collection(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos');
 
         let selectedFile, selectedThumb, tokenClient, accessToken;
-        let currentEditingVideo = null; // 현재 수정 중인 영상 데이터 저장
+        let currentEditingVideo = null; 
 
         window.onload = async () => {
             try {
@@ -280,7 +286,6 @@
             selectedThumb = src;
         };
 
-        // 업로드 또는 수정 버튼 통합 핸들러
         window.handleFinalAction = () => {
             if (!selectedThumb || !document.getElementById('input-title').value) {
                 alert("제목을 입력하고 썸네일을 선택해주세요.");
@@ -329,7 +334,6 @@
             }
         }
 
-        // 기존 정보 수정 로직
         async function updateExistingVideo() {
             showLoading("정보를 수정하는 중...");
             try {
@@ -429,7 +433,6 @@
             currentEditingVideo = null;
         };
 
-        // 수정 모드 열기
         window.openEditMode = () => {
             if (!currentEditingVideo) return;
             
@@ -440,13 +443,11 @@
             document.getElementById('step-2-guide').innerText = "기존 썸네일을 유지하거나 새로운 정보를 입력하세요.";
             document.getElementById('final-action-btn').innerText = "수정 완료";
 
-            // 기존 값 채우기
             document.getElementById('input-title').value = currentEditingVideo.title;
             document.getElementById('input-category').value = currentEditingVideo.category;
             document.getElementById('input-author').value = currentEditingVideo.author;
             selectedThumb = currentEditingVideo.thumbnail;
 
-            // 썸네일 컨테이너에 현재 썸네일 하나만 표시 (수정시는 하나만 보여줌)
             document.getElementById('thumbnail-container').innerHTML = `
                 <div class="thumb-option selected col-span-2">
                     <img src="${selectedThumb}" class="w-full aspect-video object-cover rounded-lg">
@@ -457,6 +458,34 @@
             `;
 
             modal.classList.replace('hidden', 'flex');
+        };
+
+        // 영상 삭제 기능
+        window.deleteVideo = async () => {
+            if (!currentEditingVideo) return;
+            if (!confirm(`[${currentEditingVideo.title}] 게시물을 정말 삭제할까요?\n구글 드라이브 원본 파일도 함께 삭제됩니다.`)) return;
+
+            showLoading("삭제 중입니다...");
+            try {
+                // 1. 구글 드라이브 파일 삭제
+                if (accessToken) {
+                    await fetch(`https://www.googleapis.com/drive/v3/files/${currentEditingVideo.fileId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                }
+
+                // 2. 파이어베이스 데이터 삭제
+                const videoRef = doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', currentEditingVideo.id);
+                await deleteDoc(videoRef);
+
+                alert("삭제되었습니다.");
+                location.reload();
+            } catch (e) {
+                console.error(e);
+                alert("삭제 중 오류가 발생했습니다: " + e.message);
+                hideLoading();
+            }
         };
 
         window.openAdmin = () => {
