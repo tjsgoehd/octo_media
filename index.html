@@ -11,11 +11,9 @@
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; letter-spacing: -0.025em; }
         
-        /* 비디오 카드 스타일 */
         .video-card { background: white; border-radius: 20px; overflow: hidden; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); cursor: pointer; border: 1px solid #f1f5f9; }
         .video-card:hover { transform: translateY(-6px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-color: #e2e8f0; }
         
-        /* 썸네일 내부 작성자 배지 */
         .author-badge {
             position: absolute;
             top: 12px;
@@ -34,7 +32,6 @@
             border: 1.5px solid rgba(255, 255, 255, 0.3);
         }
 
-        /* 카테고리 스타일 */
         .category-text {
             color: #2563eb;
             font-size: 13px;
@@ -43,7 +40,6 @@
             display: inline-block;
         }
 
-        /* 제목 스타일 */
         .video-title {
             font-size: 1.15rem;
             font-weight: 800;
@@ -52,7 +48,6 @@
             letter-spacing: -0.03em;
         }
 
-        /* 썸네일 선택 스타일 */
         .thumb-option { border: 4px solid transparent; border-radius: 14px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
         .thumb-option.selected { border-color: #2563eb; transform: scale(1.05); z-index: 10; }
         
@@ -107,7 +102,6 @@
         </div>
     </header>
 
-    <!-- 검색 및 필터 섹션 -->
     <section class="bg-white">
         <div class="max-w-7xl mx-auto px-4 py-6">
             <div class="max-w-4xl mx-auto space-y-6">
@@ -135,7 +129,6 @@
         </div>
     </section>
 
-    <!-- 메인 콘텐츠 영역 -->
     <main class="max-w-7xl mx-auto px-4 pb-20 pt-4">
         <div class="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
             <div class="flex items-center gap-2 font-extrabold text-lg text-slate-800">
@@ -145,12 +138,9 @@
             <span id="video-count" class="text-slate-400 text-xs font-bold">총 0개</span>
         </div>
 
-        <div id="video-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-7">
-            <!-- 영상 목록 로드 영역 -->
-        </div>
+        <div id="video-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-7"></div>
     </main>
 
-    <!-- 업로드/수정 모달 -->
     <div id="admin-modal" class="fixed inset-0 z-[1100] hidden items-center justify-center p-4">
         <div class="bg-white w-full max-w-xl rounded-[40px] p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div class="flex justify-between items-center mb-8">
@@ -196,13 +186,11 @@
         </div>
     </div>
 
-    <!-- 로딩 오버레이 -->
     <div id="loading-overlay" class="fixed inset-0 z-[2000] hidden flex-col items-center justify-center text-white">
         <div class="w-14 h-14 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mb-6"></div>
         <p id="loading-text" class="font-extrabold text-xl"></p>
     </div>
 
-    <!-- 플레이어 모달 -->
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
         <div class="w-full max-w-5xl" onclick="event.stopPropagation()">
             <div id="video-frame" class="bg-black rounded-[32px] overflow-hidden aspect-video shadow-2xl relative border border-white/10">
@@ -299,12 +287,12 @@
             const grid = document.getElementById('video-grid');
             if (!grid) return;
 
-            // 데이터의 title이나 author가 없는 경우를 대비해 방어 코드 추가
             const filtered = allVideos.filter(v => {
                 const categoryMatch = (currentFilter === '전체' || v.category === currentFilter);
-                const titleMatch = (v.title || '').toLowerCase().includes(searchQuery);
-                const authorMatch = (v.author || '').toLowerCase().includes(searchQuery);
-                return categoryMatch && (titleMatch || authorMatch);
+                const titleStr = (v.title || '').toLowerCase();
+                const authorStr = (v.author || '').toLowerCase();
+                const searchMatch = titleStr.includes(searchQuery) || authorStr.includes(searchQuery);
+                return categoryMatch && searchMatch;
             });
 
             document.getElementById('video-count').innerText = `총 ${filtered.length}개`;
@@ -377,10 +365,13 @@
         window.requestToken = () => { tokenClient.requestAccessToken({ prompt: 'select_account' }); };
 
         async function startProcess() {
-            showLoading("파일 업로드 중...");
+            showLoading("파일 업로드 준비 중...");
             try {
                 const folderId = await findOrCreateFolder('octo_media');
+                showLoading("파일 업로드 중...");
                 const fileId = await uploadFileToDrive(folderId);
+                
+                showLoading("데이터베이스 등록 중...");
                 await addDoc(targetCollection, {
                     fileId, thumbnail: selectedThumb,
                     title: document.getElementById('input-title').value,
@@ -388,8 +379,14 @@
                     author: document.getElementById('input-author').value || '익명',
                     timestamp: serverTimestamp()
                 });
+                
+                hideLoading();
                 location.reload();
-            } catch (err) { alert("오류: " + err.message); hideLoading(); }
+            } catch (err) { 
+                console.error(err);
+                alert("업로드 중 오류가 발생했습니다: " + err.message); 
+                hideLoading(); 
+            }
         }
 
         async function updateExistingVideo() {
@@ -407,11 +404,15 @@
 
         async function findOrCreateFolder(name) {
             const q = encodeURIComponent(`name = '${name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
-            const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}`, { 
+                headers: { 'Authorization': `Bearer ${accessToken}` } 
+            });
             const data = await res.json();
             if (data.files?.length > 0) return data.files[0].id;
+            
             const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
-                method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                method: 'POST', 
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' })
             });
             const folderData = await cr.json();
@@ -421,6 +422,7 @@
         async function uploadFileToDrive(folderId) {
             const metadata = { name: selectedFile.name, parents: [folderId] };
             
+            // 1. Resumable Upload URL 요청
             const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
                 method: 'POST', 
                 headers: { 
@@ -430,13 +432,26 @@
                 body: JSON.stringify(metadata)
             });
 
-            const uploadUrl = res.headers.get('Location');
-            if (!uploadUrl) throw new Error("업로드 URL을 가져오지 못했습니다.");
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(`메타데이터 업로드 실패: ${errorData.error?.message || res.statusText}`);
+            }
 
-            const uploadRes = await fetch(uploadUrl, {
-                method: 'PUT',
-                body: selectedFile
+            // 2. Location 헤더에서 업로드 URL 추출
+            const uploadUrl = res.headers.get('Location');
+            if (!uploadUrl) {
+                throw new Error("업로드 URL(Location 헤더)을 가져오지 못했습니다. 구글 API 응답 형식을 확인하세요.");
+            }
+
+            // 3. 실제 파일 데이터 업로드
+            const uploadRes = await fetch(uploadUrl, { 
+                method: 'PUT', 
+                body: selectedFile 
             });
+
+            if (!uploadRes.ok) {
+                throw new Error("파일 데이터 전송 실패");
+            }
 
             const finalData = await uploadRes.json();
             return finalData.id;
