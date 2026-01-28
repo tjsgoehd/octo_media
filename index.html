@@ -42,7 +42,8 @@
             <div>
                 <p class="text-red-900 font-extrabold text-base mb-1">Firebase 인증 구성 오류</p>
                 <p class="text-red-700 text-sm leading-relaxed font-medium">
-                    콘솔 설정이 누락되었습니다. <b>Firebase Console > Authentication > Sign-in method</b> 메뉴에서 <b>'익명(Anonymous)'</b> 로그인을 활성화해야 영상 목록 저장 및 조회가 정상적으로 작동합니다.
+                    익명 로그인 기능이 비활성화되어 있습니다. <br>
+                    <b>Firebase Console > Authentication > Sign-in method</b> 메뉴에서 <b>'익명(Anonymous)'</b> 로그인을 활성화해야 영상 목록 저장 및 조회가 가능합니다.
                 </p>
                 <button onclick="location.reload()" class="mt-3 text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition-colors">다시 시도</button>
             </div>
@@ -132,14 +133,17 @@
         import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
         const CLIENT_ID = '131660349524-lfu2c56t4ent6167fu68essbleoquptp.apps.googleusercontent.com';
-        const API_KEY = 'AIzaSyDGd9HdGJgdDqy-LB81rPtYzW4INOwccLU';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-        const firebaseConfig = { 
-            apiKey: API_KEY, 
-            authDomain: "octopath-85851.firebaseapp.com", 
-            projectId: "octopath-85851", 
-            appId: "1:744016190979:web:fbc5badeda2e24f5f47836" 
+        // 사용자 제공 파이어베이스 설정 적용
+        const firebaseConfig = {
+            apiKey: "AIzaSyAjbApqAPhrZXcnR2P_xd-nvrZOvZp67CI",
+            authDomain: "octopath-85851.firebaseapp.com",
+            projectId: "octopath-85851",
+            storageBucket: "octopath-85851.firebasestorage.app",
+            messagingSenderId: "744016190979",
+            appId: "1:744016190979:web:fbc5badeda2e24f5f47836",
+            measurementId: "G-T66TC51C7W"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -163,7 +167,6 @@
                     return;
                 }
                 
-                // 타임스탬프 기준 정렬
                 const sortedVideos = videos.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
                 grid.innerHTML = sortedVideos.map(v => `
@@ -181,10 +184,7 @@
                 lucide.createIcons();
             }, (error) => {
                 console.error("Firestore Loading Error:", error);
-                // 데이터 로드 실패 시에도 안내
-                if (isAuthConfigError) {
-                    grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-400">인증 설정이 되어있지 않아 데이터를 가져올 수 없습니다.</div>`;
-                }
+                grid.innerHTML = `<div class="col-span-full py-20 text-center text-red-400 font-medium">데이터 로드 실패 (권한 부족 또는 설정 오류)</div>`;
             });
         }
 
@@ -206,25 +206,22 @@
         }
 
         window.onload = async () => {
-            // 1. Firebase 익명 로그인 시도 (설정 누락 시 에러 핸들링)
             try {
                 const userCredential = await signInAnonymously(auth);
                 currentUser = userCredential.user;
-                console.log("Firebase 인증 성공");
             } catch (error) {
-                console.error("Firebase Auth Exception:", error.code);
                 if (error.code === 'auth/configuration-not-found') {
                     isAuthConfigError = true;
-                    // 인증 구성 오류 시 사용자에게 시각적 경고 표시
                     document.getElementById('auth-warning').classList.remove('hidden');
                     lucide.createIcons();
                 }
             }
 
-            // 2. 인증 상태와 관계없이 목록 로드 시도 (권한이 허용되어 있을 수도 있으므로)
             onAuthStateChanged(auth, (user) => {
-                if (user) currentUser = user;
-                loadVideos();
+                if (user || isAuthConfigError) {
+                    if (user) currentUser = user;
+                    loadVideos();
+                }
             });
 
             initTokenClient();
@@ -232,11 +229,11 @@
 
         window.requestToken = () => {
             if (isAuthConfigError) {
-                alert("Firebase 인증 기능이 꺼져 있어 업로드 정보를 저장할 수 없습니다.\n안내 문구에 따라 '익명 로그인'을 먼저 활성화해 주세요.");
+                alert("Firebase 인증(익명 로그인)이 비활성화되어 있습니다. Firebase Console에서 설정을 활성화해 주세요.");
                 return;
             }
             if (!currentUser) {
-                alert("Firebase 연결 중입니다. 잠시만 기다려주세요.");
+                alert("사용자 인증 정보가 없습니다. 잠시 후 다시 시도해 주세요.");
                 return;
             }
             
@@ -321,9 +318,8 @@
                     body: JSON.stringify({ role: 'reader', type: 'anyone' })
                 });
 
-                // Firestore 저장 시도
                 await addDoc(collection(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos'), {
-                    url: `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`,
+                    url: `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${firebaseConfig.apiKey}`,
                     thumbnail: selectedThumb,
                     title: document.getElementById('input-title').value,
                     category: document.getElementById('input-category').value,
@@ -333,7 +329,7 @@
                 location.reload();
             } catch (err) { 
                 console.error("Save Error:", err);
-                alert("목록 등록에 실패했습니다. Firebase 보안 규칙이나 인증 설정을 확인하세요."); 
+                alert("Firestore 저장 실패. 설정을 확인하세요."); 
                 hideLoading(); 
             }
         }
