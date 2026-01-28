@@ -107,7 +107,7 @@
         </div>
     </header>
 
-    <!-- 검색 및 필터 섹션 (문구 삭제됨) -->
+    <!-- 검색 및 필터 섹션 -->
     <section class="bg-white">
         <div class="max-w-7xl mx-auto px-4 py-6">
             <div class="max-w-4xl mx-auto space-y-6">
@@ -285,7 +285,7 @@
         }
 
         window.handleSearch = (val) => {
-            searchQuery = val.toLowerCase().trim();
+            searchQuery = (val || '').toLowerCase().trim();
             renderVideos();
         };
 
@@ -297,8 +297,15 @@
 
         function renderVideos() {
             const grid = document.getElementById('video-grid');
-            const filtered = allVideos.filter(v => (currentFilter === '전체' || v.category === currentFilter) && 
-                (v.title.toLowerCase().includes(searchQuery) || (v.author && v.author.toLowerCase().includes(searchQuery))));
+            if (!grid) return;
+
+            // 데이터의 title이나 author가 없는 경우를 대비해 방어 코드 추가
+            const filtered = allVideos.filter(v => {
+                const categoryMatch = (currentFilter === '전체' || v.category === currentFilter);
+                const titleMatch = (v.title || '').toLowerCase().includes(searchQuery);
+                const authorMatch = (v.author || '').toLowerCase().includes(searchQuery);
+                return categoryMatch && (titleMatch || authorMatch);
+            });
 
             document.getElementById('video-count').innerText = `총 ${filtered.length}개`;
 
@@ -312,11 +319,11 @@
                                 <i data-lucide="user" class="w-3.5 h-3.5" fill="white"></i>
                                 <span>${v.author || '익명'}</span>
                             </div>
-                            <img src="${v.thumbnail}" class="w-full h-full object-cover">
+                            <img src="${v.thumbnail || ''}" class="w-full h-full object-cover">
                         </div>
                         <div class="p-5">
-                            <span class="category-text">${v.category}</span>
-                            <h3 class="video-title line-clamp-2">${v.title}</h3>
+                            <span class="category-text">${v.category || '기타'}</span>
+                            <h3 class="video-title line-clamp-2">${v.title || '제목 없음'}</h3>
                         </div>
                     </div>
                 `).join('');
@@ -373,7 +380,7 @@
             showLoading("파일 업로드 중...");
             try {
                 const folderId = await findOrCreateFolder('octo_media');
-                const fileId = await uploadFile(folderId);
+                const fileId = await uploadFileToDrive(folderId);
                 await addDoc(targetCollection, {
                     fileId, thumbnail: selectedThumb,
                     title: document.getElementById('input-title').value,
@@ -407,18 +414,32 @@
                 method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' })
             });
-            return (await cr.json()).id;
+            const folderData = await cr.json();
+            return folderData.id;
         }
 
-        async function uploadFile(folderId) {
+        async function uploadFileToDrive(folderId) {
+            const metadata = { name: selectedFile.name, parents: [folderId] };
+            
             const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
-                method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: selectedFile.name, parents: [folderId] })
+                method: 'POST', 
+                headers: { 
+                    'Authorization': `Bearer ${accessToken}`, 
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify(metadata)
             });
+
             const uploadUrl = res.headers.get('Location');
-            const xhr = new XMLHttpRequest();
-            xhr.open('PUT', uploadUrl, false); xhr.send(selectedFile);
-            return JSON.parse(xhr.response).id;
+            if (!uploadUrl) throw new Error("업로드 URL을 가져오지 못했습니다.");
+
+            const uploadRes = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: selectedFile
+            });
+
+            const finalData = await uploadRes.json();
+            return finalData.id;
         }
 
         window.openPlayer = (fileId, docId, videoData) => {
@@ -443,9 +464,9 @@
             document.getElementById('modal-title').innerText = "정보 수정";
             document.getElementById('upload-step-1').classList.add('hidden');
             document.getElementById('upload-step-2').classList.remove('hidden');
-            document.getElementById('input-title').value = currentEditingVideo.title;
-            document.getElementById('input-category').value = currentEditingVideo.category;
-            document.getElementById('input-author').value = currentEditingVideo.author;
+            document.getElementById('input-title').value = currentEditingVideo.title || '';
+            document.getElementById('input-category').value = currentEditingVideo.category || '기타';
+            document.getElementById('input-author').value = currentEditingVideo.author || '';
             selectedThumb = currentEditingVideo.thumbnail;
             document.getElementById('thumbnail-container').innerHTML = `<div class="thumb-option selected col-span-2"><img src="${selectedThumb}" class="w-full rounded-lg"></div>`;
             document.getElementById('admin-modal').classList.replace('hidden', 'flex');
