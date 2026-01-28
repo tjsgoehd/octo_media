@@ -6,9 +6,8 @@
     <title>옥튜브 - 구글 드라이브 스마트 아카이브</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- 최신 Google GSI 라이브러리 및 API 로더 -->
+    <!-- 구글 서비스 로더 -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; letter-spacing: -0.025em; }
@@ -34,9 +33,6 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-8">
-        <!-- 시스템 상태 메시지 (치명적인 오류가 아니면 숨김 유지) -->
-        <div id="system-alert" class="hidden mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl text-amber-800 text-sm font-medium"></div>
-
         <div id="video-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
             <div class="col-span-full py-32 text-center text-slate-400">데이터를 불러오는 중...</div>
         </div>
@@ -51,13 +47,10 @@
             </div>
             
             <div id="upload-step-1" class="space-y-6">
-                <div class="bg-blue-50 border border-blue-200 p-5 rounded-2xl">
-                    <p class="text-blue-800 font-bold text-sm mb-2 flex items-center gap-2">
-                        <i data-lucide="check-circle" class="w-4 h-4 text-green-600"></i> 테스트 사용자/인증 설정 확인됨
-                    </p>
+                <div class="bg-blue-50 border border-blue-100 p-5 rounded-2xl">
+                    <p class="text-blue-800 font-bold text-sm mb-1">안내사항</p>
                     <p class="text-blue-700 text-xs leading-relaxed">
-                        구글 로그인 시 <b>tjsgoehd@gmail.com</b> 계정을 사용하세요. <br>
-                        "안전하지 않은 앱" 경고 발생 시 <b>'고급' > '...이동'</b>을 선택해 주세요.
+                        구글 드라이브에 영상이 업로드되며, 자동으로 전체 공개(링크가 있는 모든 사용자) 권한이 부여됩니다.
                     </p>
                 </div>
                 <div class="border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center hover:border-blue-500 transition-colors">
@@ -85,8 +78,8 @@
                             <input id="input-author" type="text" placeholder="작성자" class="w-full px-4 py-3 bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all">
                         </div>
                     </div>
-                    <button onclick="handleGoogleAuth()" class="w-full py-4 bg-blue-600 text-white font-bold rounded-xl mt-6 shadow-lg hover:bg-blue-700 transition-all active:scale-95">
-                        구글 인증 및 업로드
+                    <button id="auth-btn" onclick="requestToken()" class="w-full py-4 bg-blue-600 text-white font-bold rounded-xl mt-6 shadow-lg hover:bg-blue-700 transition-all active:scale-95">
+                        구글 로그인 및 업로드 시작
                     </button>
                 </div>
             </div>
@@ -102,128 +95,126 @@
     <!-- 플레이어 -->
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
         <div class="w-full max-w-4xl" onclick="event.stopPropagation()">
-            <div id="video-frame" class="bg-black rounded-3xl overflow-hidden aspect-video shadow-2xl"></div>
+            <div id="video-frame" class="bg-black rounded-3xl overflow-hidden aspect-video shadow-2xl relative">
+                <!-- 비디오가 들어갈 자리 -->
+            </div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
-        // --- 설정 데이터 ---
+        // --- 필수 설정 (구글 콘솔과 반드시 일치해야 함) ---
         const CLIENT_ID = '131660349524-lfu2c56t4ent6167fu68essbleoquptp.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyDGd9HdGJgdDqy-LB81rPtYzW4INOwccLU';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-        const firebaseConfig = { apiKey: API_KEY, authDomain: "octopath-85851.firebaseapp.com", projectId: "octopath-85851", appId: "1:744016190979:web:fbc5badeda2e24f5f47836" };
 
-        // --- 초기화 ---
+        const firebaseConfig = { 
+            apiKey: API_KEY, 
+            authDomain: "octopath-85851.firebaseapp.com", 
+            projectId: "octopath-85851", 
+            appId: "1:744016190979:web:fbc5badeda2e24f5f47836" 
+        };
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
 
-        let selectedFile, selectedThumb, tokenClient, accessToken;
+        let selectedFile, selectedThumb, tokenClient;
 
-        // 시스템 알림
-        function showSystemAlert(msg, type = 'error') {
-            const alert = document.getElementById('system-alert');
-            alert.innerText = msg;
-            alert.classList.remove('hidden');
-            if(type === 'warning') {
-                alert.className = "mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl text-amber-800 text-sm font-medium";
-            }
-        }
-
-        // 비디오 로드 (인증 상태와 무관하게 실행 시도)
+        // 영상 목록 실시간 로드
         function loadVideos() {
+            const grid = document.getElementById('video-grid');
             onSnapshot(collection(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos'), (snap) => {
-                const grid = document.getElementById('video-grid');
                 const videos = snap.docs.map(doc => doc.data());
-                if (videos.length === 0) { grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-400">등록된 영상이 없습니다.</div>`; return; }
-                grid.innerHTML = videos.sort((a,b) => b.timestamp - a.timestamp).map(v => `
+                if (videos.length === 0) {
+                    grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-400">등록된 영상이 없습니다.</div>`;
+                    return;
+                }
+                grid.innerHTML = videos.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)).map(v => `
                     <div class="video-card" onclick="openPlayer('${v.url}')">
-                        <img src="${v.thumbnail}" class="w-full aspect-video object-cover">
+                        <img src="${v.thumbnail}" class="w-full aspect-video object-cover" onerror="this.src='https://via.placeholder.com/640x360?text=No+Thumbnail'">
                         <div class="p-4">
-                            <p class="text-[10px] font-bold text-blue-600 uppercase mb-1">${v.category}</p>
+                            <p class="text-[10px] font-bold text-blue-600 uppercase mb-1">${v.category || '기타'}</p>
                             <h3 class="font-bold text-sm truncate text-slate-800">${v.title}</h3>
                             <div class="flex justify-between items-center mt-3">
-                                <span class="text-[10px] text-slate-400">${v.author}</span>
+                                <span class="text-[10px] text-slate-400">${v.author || '익명'}</span>
                             </div>
                         </div>
                     </div>
                 `).join('');
                 lucide.createIcons();
-            }, (err) => {
-                console.error("Firestore 에러:", err);
-                if(err.code === 'permission-denied') showSystemAlert("접근 권한이 거부되었습니다. 보안 규칙을 확인해 주세요.");
             });
         }
 
-        // 앱 기동
-        loadVideos();
-        
-        // 인증 처리: 에러가 나더라도 무시하고 진행
-        try {
-            signInAnonymously(auth).catch(err => {
-                console.warn("익명 로그인 건너뜀 (이미 활성화되어 있거나 무시 가능한 오류):", err.message);
-                // 설정이 되어있는데도 에러가 난다면, 파이어베이스 내부 통신 일시 오류일 가능성이 큼
-            });
-        } catch(e) {}
-
         // 구글 Identity Services 초기화
-        window.onload = () => {
-            if (typeof gapi !== 'undefined') {
-                gapi.load('client', () => {
-                    gapi.client.init({ apiKey: API_KEY, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] })
-                    .catch(e => console.error("GAPI 초기화 실패", e));
-                });
+        function initTokenClient() {
+            if (typeof google === 'undefined') {
+                setTimeout(initTokenClient, 500);
+                return;
             }
-
-            if (typeof google !== 'undefined') {
-                tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: SCOPES,
-                    callback: (resp) => {
-                        if (resp.access_token) {
-                            accessToken = resp.access_token;
-                            uploadToDrive();
-                        } else {
-                            hideLoading();
-                            if(resp.error) alert("인증 오류: " + resp.error);
-                        }
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (tokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        startUploadProcess(tokenResponse.access_token);
+                    } else {
+                        hideLoading();
+                        alert("인증에 실패했습니다. 구글 계정 접근을 허용해 주세요.");
                     }
-                });
-            }
+                },
+            });
+        }
+
+        window.onload = () => {
+            loadVideos();
+            signInAnonymously(auth);
+            initTokenClient();
         };
 
-        // 파일 선택 및 썸네일 추출
+        // 토큰 요청 실행
+        window.requestToken = () => {
+            const title = document.getElementById('input-title').value;
+            if (!selectedThumb || !title) return alert("제목과 썸네일을 확인해 주세요.");
+            
+            showLoading("구글 인증 진행 중...");
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        };
+
+        // 파일 선택 시 썸네일 추출
         window.handleFileSelect = async (e) => {
             selectedFile = e.target.files[0];
             if (!selectedFile) return;
+
             showLoading("영상을 분석하여 썸네일을 생성 중입니다...");
             const videoUrl = URL.createObjectURL(selectedFile);
             const video = document.createElement('video');
             video.src = videoUrl;
             video.muted = true;
+            
             video.onloadedmetadata = async () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                const results = [];
+                const thumbs = [];
                 for (let t of [0.1, 0.3, 0.5, 0.7, 0.9]) {
                     video.currentTime = t * video.duration;
                     await new Promise(r => video.onseeked = r);
                     canvas.width = 640; canvas.height = 360;
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    results.push(canvas.toDataURL('image/jpeg', 0.6));
+                    thumbs.push(canvas.toDataURL('image/jpeg', 0.6));
                 }
                 document.getElementById('upload-step-1').classList.add('hidden');
                 document.getElementById('upload-step-2').classList.remove('hidden');
-                document.getElementById('thumbnail-container').innerHTML = results.map(src => `
+                document.getElementById('thumbnail-container').innerHTML = thumbs.map(src => `
                     <div class="thumb-option" onclick="selectThumb(this, '${src}')">
                         <img src="${src}" class="w-full aspect-video object-cover rounded-lg">
                     </div>
                 `).join('');
                 hideLoading();
+                URL.revokeObjectURL(videoUrl);
             };
         };
 
@@ -233,40 +224,40 @@
             selectedThumb = src;
         };
 
-        window.handleGoogleAuth = () => {
-            const title = document.getElementById('input-title').value;
-            if (!selectedThumb || !title) return alert("제목과 썸네일을 선택해 주세요.");
-            showLoading("구글 인증 창을 확인해 주세요...");
-            tokenClient.requestAccessToken({ prompt: 'consent' });
-        };
-
-        async function uploadToDrive() {
-            showLoading("구글 드라이브에 업로드 중입니다...");
+        // 실제 업로드 로직
+        async function startUploadProcess(token) {
+            showLoading("구글 드라이브로 파일을 전송 중...");
             try {
+                // 1. 영상 업로드 (Multipart 방식)
                 const metadata = { name: selectedFile.name, mimeType: selectedFile.type };
-                const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', selectedFile);
+                const formData = new FormData();
+                formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                formData.append('file', selectedFile);
 
-                const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${accessToken}` },
-                    body: form
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
                 });
-                
-                if (!res.ok) throw new Error("드라이브 업로드 실패");
-                const file = await res.json();
-                
-                // 파일 공유 권한 설정
-                await fetch(`https://www.googleapis.com/api/drive/v3/files/${file.id}/permissions`, {
+
+                if (!uploadRes.ok) throw new Error("파일 업로드 실패");
+                const fileData = await uploadRes.json();
+
+                // 2. 파일 권한 공개 설정
+                showLoading("공개 권한 설정 중...");
+                await fetch(`https://www.googleapis.com/api/drive/v3/files/${fileData.id}/permissions`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ role: 'reader', type: 'anyone' })
                 });
 
-                // 데이터베이스 등록 (인증 에러가 있더라도 진행 가능하도록 시도)
+                // 3. 파이어베이스 데이터베이스 저장
+                showLoading("아카이브 등록 중...");
                 await addDoc(collection(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos'), {
-                    url: `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${API_KEY}`,
+                    url: `https://www.googleapis.com/drive/v3/files/${fileData.id}?alt=media&key=${API_KEY}`,
                     thumbnail: selectedThumb,
                     title: document.getElementById('input-title').value,
                     category: document.getElementById('input-category').value,
@@ -274,24 +265,30 @@
                     timestamp: serverTimestamp()
                 });
 
-                alert("성공적으로 등록되었습니다!");
+                hideLoading();
+                alert("업로드가 완료되었습니다!");
                 location.reload();
-            } catch (e) {
-                console.error(e);
-                alert("처리 중 오류 발생: " + e.message);
+            } catch (err) {
+                console.error("업로드 에러 상세:", err);
+                alert("처리 중 오류가 발생했습니다: " + err.message);
                 hideLoading();
             }
         }
 
-        // 모달 및 플레이어 제어
         window.openPlayer = (url) => {
-            document.getElementById('video-frame').innerHTML = `<video src="${url}" controls autoplay class="w-full h-full"></video>`;
+            document.getElementById('video-frame').innerHTML = `
+                <video src="${url}" controls autoplay class="w-full h-full"></video>
+                <button onclick="closePlayer()" class="absolute top-4 right-4 text-white/50 hover:text-white"><i data-lucide="x-circle"></i></button>
+            `;
             document.getElementById('player-modal').classList.replace('hidden', 'flex');
+            lucide.createIcons();
         };
+
         window.closePlayer = () => {
             document.getElementById('video-frame').innerHTML = '';
             document.getElementById('player-modal').classList.replace('flex', 'hidden');
         };
+
         window.openAdmin = () => document.getElementById('admin-modal').classList.replace('hidden', 'flex');
         window.closeAdmin = () => document.getElementById('admin-modal').classList.replace('flex', 'hidden');
         function showLoading(t) { document.getElementById('loading-text').innerText = t; document.getElementById('loading-overlay').classList.replace('hidden', 'flex'); }
