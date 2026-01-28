@@ -16,6 +16,9 @@
         .thumb-option.selected { border-color: #2563eb; transform: scale(1.05); z-index: 10; }
         #player-modal, #admin-modal, #loading-overlay { backdrop-filter: blur(16px); background-color: rgba(0, 0, 0, 0.9); }
         iframe { background-color: #000; }
+        .admin-badge { display: none; }
+        body.is-admin .admin-badge { display: flex; }
+        body.is-admin .login-btn { display: none; }
     </style>
 </head>
 <body class="text-slate-900">
@@ -28,7 +31,14 @@
                 </div>
                 <span class="font-extrabold text-lg tracking-tighter">옥튜브</span>
             </div>
-            <button onclick="openAdmin()" class="bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-slate-800 transition-colors">영상 등록</button>
+            <div class="flex items-center gap-2">
+                <div class="admin-badge items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-[10px] font-bold border border-blue-100">
+                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+                    관리자 인증됨
+                </div>
+                <button onclick="requestToken()" class="login-btn bg-slate-100 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:bg-slate-200 transition-colors">관리자 로그인</button>
+                <button onclick="openAdmin()" class="bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-slate-800 transition-colors">영상 등록</button>
+            </div>
         </div>
     </header>
 
@@ -72,7 +82,7 @@
                             <input id="input-author" type="text" placeholder="작성자" class="w-full px-4 py-3 bg-slate-100 rounded-xl outline-none">
                         </div>
                     </div>
-                    <button id="auth-btn" onclick="requestToken()" class="w-full py-4 bg-blue-600 text-white font-bold rounded-xl mt-6 shadow-lg hover:bg-blue-700 transition-all">
+                    <button id="final-upload-btn" onclick="startProcessWithCheck()" class="w-full py-4 bg-blue-600 text-white font-bold rounded-xl mt-6 shadow-lg hover:bg-blue-700 transition-all">
                         구글 드라이브 업로드 및 등록
                     </button>
                 </div>
@@ -133,6 +143,13 @@
                 await signInAnonymously(auth);
                 loadVideos();
                 initGoogleAuth();
+                
+                // 세션 스토리지에 토큰이 있다면 자동 로그인 시도
+                const savedToken = sessionStorage.getItem('gdrive_token');
+                if (savedToken) {
+                    accessToken = savedToken;
+                    document.body.classList.add('is-admin');
+                }
             } catch (e) { console.error("Firebase Auth Fail", e); }
         };
 
@@ -144,7 +161,15 @@
                     callback: (resp) => {
                         if (resp.error) return;
                         accessToken = resp.access_token;
-                        startProcess();
+                        sessionStorage.setItem('gdrive_token', accessToken); // 토큰 저장
+                        document.body.classList.add('is-admin');
+                        
+                        // 업로드 중에 로그인 요청이 온 경우 프로세스 재개
+                        if (document.getElementById('admin-modal').classList.contains('flex') && selectedFile) {
+                            startProcess();
+                        } else {
+                            alert("관리자 인증이 완료되었습니다.");
+                        }
                     },
                 });
             }
@@ -233,12 +258,23 @@
             selectedThumb = src;
         };
 
-        window.requestToken = () => {
+        // 관리자 인증 여부 확인 후 진행
+        window.startProcessWithCheck = () => {
             if (!selectedThumb || !document.getElementById('input-title').value) {
                 alert("제목을 입력하고 썸네일을 선택해주세요.");
                 return;
             }
-            tokenClient.requestAccessToken({ prompt: '' });
+
+            if (accessToken) {
+                startProcess();
+            } else {
+                // 토큰이 없으면 로그인 요청
+                tokenClient.requestAccessToken({ prompt: '' });
+            }
+        };
+
+        window.requestToken = () => {
+            tokenClient.requestAccessToken({ prompt: 'select_account' });
         };
 
         async function startProcess() {
@@ -248,11 +284,18 @@
                 const fileId = await uploadFile(folderId);
                 await saveToFirestore(fileId);
                 
-                alert("성공적으로 등록되었습니다! 구글 드라이브에서 octo_media 폴더를 전체 공개로 설정해야 영상이 보입니다.");
+                alert("성공적으로 등록되었습니다!");
                 location.reload();
             } catch (err) {
                 console.error(err);
-                alert("등록 중 오류: " + err.message);
+                if (err.status === 401) {
+                    accessToken = null;
+                    sessionStorage.removeItem('gdrive_token');
+                    alert("인증이 만료되었습니다. 다시 로그인해 주세요.");
+                    tokenClient.requestAccessToken({ prompt: '' });
+                } else {
+                    alert("등록 중 오류: " + err.message);
+                }
                 hideLoading();
             }
         }
@@ -262,6 +305,9 @@
             const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}`, {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
+            
+            if (res.status === 401) throw { status: 401, message: 'Unauthorized' };
+            
             const data = await res.json();
             if (data.files && data.files.length > 0) return data.files[0].id;
 
@@ -281,6 +327,9 @@
                 headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(metadata)
             });
+            
+            if (res.status === 401) throw { status: 401, message: 'Unauthorized' };
+            
             const uploadUrl = res.headers.get('Location');
 
             return new Promise((resolve, reject) => {
@@ -326,7 +375,10 @@
         };
 
         window.openAdmin = () => document.getElementById('admin-modal').classList.replace('hidden', 'flex');
-        window.closeAdmin = () => location.reload();
+        window.closeAdmin = () => {
+            document.getElementById('admin-modal').classList.replace('flex', 'hidden');
+            // 입력 폼 초기화는 생략 (필요시 추가)
+        };
 
         function showLoading(t, p = false) {
             document.getElementById('loading-text').innerText = t;
