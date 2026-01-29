@@ -25,12 +25,11 @@
         .filter-btn { transition: all 0.2s; background: white; color: #64748b; border: 1px solid #f1f5f9; }
         .filter-btn.active { background-color: #2563eb; color: white; border-color: #2563eb; }
 
-        #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.9); }
+        #player-modal, #admin-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.9); }
         
         .admin-only { display: none !important; }
         body.is-admin .admin-only { display: flex !important; }
 
-        /* 무한 로딩 방지 및 상단 버튼 차단 마스크 */
         .player-wrapper { position: relative; width: 100%; height: 100%; }
         .click-mask {
             position: absolute;
@@ -58,7 +57,7 @@
             <div class="flex items-center gap-2">
                 <button onclick="handleLogout()" class="admin-only bg-rose-50 text-rose-600 px-3 py-2 rounded-full text-[11px] font-bold border border-rose-100">로그아웃</button>
                 <button id="login-btn" onclick="initGoogleAuth()" class="bg-slate-100 text-slate-600 px-4 py-2 rounded-full text-xs font-bold">관리자 로그인</button>
-                <button onclick="alert('영상 등록 기능을 실행합니다.')" class="admin-only bg-blue-600 text-white px-5 py-2.5 rounded-full text-xs font-bold shadow-lg">영상 등록</button>
+                <button onclick="openAdminModal()" class="admin-only bg-blue-600 text-white px-5 py-2.5 rounded-full text-xs font-bold shadow-lg">영상 등록</button>
             </div>
         </div>
     </header>
@@ -76,17 +75,49 @@
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
         <div class="w-full max-w-5xl" onclick="event.stopPropagation()">
             <div class="bg-black rounded-[24px] overflow-hidden aspect-video shadow-2xl relative player-wrapper">
-                <!-- 상단 우측 버튼 차단 마스크 -->
                 <div class="click-mask"></div>
                 <div id="video-iframe-container" class="w-full h-full"></div>
             </div>
             <div class="mt-6 flex flex-wrap justify-center gap-3">
                 <button onclick="closePlayer()" class="text-white bg-white/10 px-8 py-3 rounded-full font-bold backdrop-blur-md hover:bg-white/20 transition-all">닫기</button>
-                
-                <!-- 관리자 전용 버튼 그룹 -->
                 <button id="direct-view-btn" class="admin-only text-blue-400 bg-blue-400/10 px-8 py-3 rounded-full font-bold backdrop-blur-md">새 탭에서 열기 (관리자)</button>
-                <button onclick="alert('수정 기능을 실행합니다.')" class="admin-only text-amber-400 bg-amber-400/10 px-8 py-3 rounded-full font-bold backdrop-blur-md">수정</button>
-                <button onclick="alert('삭제하시겠습니까?')" class="admin-only text-rose-400 bg-rose-400/10 px-8 py-3 rounded-full font-bold backdrop-blur-md">삭제</button>
+                <button id="edit-btn" class="admin-only text-amber-400 bg-amber-400/10 px-8 py-3 rounded-full font-bold backdrop-blur-md">수정</button>
+                <button id="delete-btn" class="admin-only text-rose-400 bg-rose-400/10 px-8 py-3 rounded-full font-bold backdrop-blur-md">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 등록/수정 모달 -->
+    <div id="admin-modal" class="fixed inset-0 z-[1100] hidden flex-col items-center justify-center p-4" onclick="closeAdminModal()">
+        <div class="bg-white rounded-[32px] w-full max-w-xl p-8 overflow-hidden relative shadow-2xl" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="modal-title" class="text-2xl font-bold text-slate-800">영상 정보 수정</h2>
+                <button onclick="closeAdminModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-slate-400 ml-1">영상 제목</label>
+                    <input type="text" id="input-title" placeholder="영상 제목을 입력하세요" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 ring-blue-100 transition-all">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-400 ml-1">카테고리</label>
+                        <select id="input-category" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 ring-blue-100">
+                            <option value="단기컷">단기컷</option>
+                            <option value="공략">공략</option>
+                            <option value="기타">기타</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-400 ml-1">작성자</label>
+                        <input type="text" id="input-author" placeholder="닉네임" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 ring-blue-100 transition-all">
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-slate-400 ml-1">구글 드라이브 파일 ID (수정 불가)</label>
+                    <input type="text" id="input-fileId" disabled class="w-full p-4 bg-slate-100 rounded-xl border-none text-slate-400 cursor-not-allowed">
+                </div>
+                <button id="save-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg mt-4 hover:bg-blue-700 transition-all">정보 업데이트</button>
             </div>
         </div>
     </div>
@@ -94,7 +125,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAjbApqAPhrZXcnR2P_xd-nvrZOvZp67CI",
@@ -111,6 +142,7 @@
         const targetCollection = collection(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos');
 
         let allVideos = [];
+        let currentEditingVideoId = null;
 
         window.onload = async () => {
             await signInAnonymously(auth);
@@ -133,7 +165,7 @@
         window.renderVideos = () => {
             const grid = document.getElementById('video-grid');
             grid.innerHTML = allVideos.map(v => `
-                <div class="video-card" onclick="openPlayer('${v.fileId}')">
+                <div class="video-card" onclick="openPlayer('${v.id}')">
                     <div class="aspect-video bg-slate-100 relative">
                         <div class="author-badge">
                             <i data-lucide="user" class="w-3 h-3"></i>
@@ -150,20 +182,88 @@
             lucide.createIcons();
         };
 
-        window.openPlayer = (fileId) => {
+        window.openPlayer = (docId) => {
+            const video = allVideos.find(v => v.id === docId);
+            if(!video) return;
+
             const container = document.getElementById('video-iframe-container');
             const directBtn = document.getElementById('direct-view-btn');
+            const editBtn = document.getElementById('edit-btn');
+            const deleteBtn = document.getElementById('delete-btn');
             
-            // 안정적인 기본 프리뷰 URL 사용 (무한로딩 방지)
-            container.innerHTML = `<iframe src="https://drive.google.com/file/d/${fileId}/preview" class="w-full h-full" allow="autoplay"></iframe>`;
+            container.innerHTML = `<iframe src="https://drive.google.com/file/d/${video.fileId}/preview" class="w-full h-full" allow="autoplay"></iframe>`;
             
-            directBtn.onclick = () => window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+            directBtn.onclick = () => window.open(`https://drive.google.com/file/d/${video.fileId}/view`, '_blank');
+            
+            // 수정 버튼 액션
+            editBtn.onclick = () => {
+                closePlayer();
+                openAdminModal(video);
+            };
+
+            // 삭제 버튼 액션
+            deleteBtn.onclick = async () => {
+                if(confirm("이 게시물을 정말로 삭제하시겠습니까?")) {
+                    try {
+                        await deleteDoc(doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', docId));
+                        closePlayer();
+                    } catch (e) {
+                        alert("삭제 중 오류가 발생했습니다.");
+                    }
+                }
+            };
+
             document.getElementById('player-modal').classList.replace('hidden', 'flex');
         };
 
         window.closePlayer = () => {
             document.getElementById('video-iframe-container').innerHTML = '';
             document.getElementById('player-modal').classList.replace('flex', 'hidden');
+        };
+
+        // 관리자 모달 제어
+        window.openAdminModal = (videoData = null) => {
+            const modal = document.getElementById('admin-modal');
+            const saveBtn = document.getElementById('save-btn');
+            
+            if(videoData) {
+                currentEditingVideoId = videoData.id;
+                document.getElementById('modal-title').innerText = "영상 정보 수정";
+                document.getElementById('input-title').value = videoData.title;
+                document.getElementById('input-category').value = videoData.category;
+                document.getElementById('input-author').value = videoData.author;
+                document.getElementById('input-fileId').value = videoData.fileId;
+                saveBtn.innerText = "정보 업데이트";
+            } else {
+                currentEditingVideoId = null;
+                document.getElementById('modal-title').innerText = "새 영상 등록";
+                // 신규 등록 로직은 기존 업로드 흐름에 따라 구현 필요
+                alert("신규 등록은 업로드 페이지를 이용해주세요.");
+                return;
+            }
+
+            modal.classList.replace('hidden', 'flex');
+            
+            saveBtn.onclick = async () => {
+                const updatedData = {
+                    title: document.getElementById('input-title').value,
+                    category: document.getElementById('input-category').value,
+                    author: document.getElementById('input-author').value
+                };
+
+                try {
+                    const videoRef = doc(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos', currentEditingVideoId);
+                    await updateDoc(videoRef, updatedData);
+                    alert("수정이 완료되었습니다.");
+                    closeAdminModal();
+                } catch (e) {
+                    alert("수정 중 오류가 발생했습니다.");
+                }
+            };
+        };
+
+        window.closeAdminModal = () => {
+            document.getElementById('admin-modal').classList.replace('flex', 'hidden');
         };
 
         window.handleLogout = () => {
@@ -179,6 +279,7 @@
         window.filterVideos = (cat) => {
             const buttons = document.querySelectorAll('.filter-btn');
             buttons.forEach(btn => btn.classList.toggle('active', btn.innerText === cat));
+            // 실제 필터링 로직 (allVideos를 기준으로 grid 재렌더링 필요시 작성)
         };
     </script>
 </body>
