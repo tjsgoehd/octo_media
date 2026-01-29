@@ -51,21 +51,6 @@
         .admin-only { display: none !important; }
         body.is-admin .admin-only { display: flex !important; }
         body.is-admin #login-btn { display: none !important; }
-
-        /* 구글 드라이브 "새 탭에서 열기" 버튼 영역 차단 마스크 */
-        .player-mask {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 80px;
-            height: 80px;
-            z-index: 10;
-            background: transparent;
-            /* 관리자일때만 클릭 가능하게 하거나, 혹은 관리자도 하단 버튼 쓰게 하려면 유지 */
-            pointer-events: auto; 
-        }
-        /* 관리자 로그인 시에는 마스크를 치워서 클릭 가능하게 함 (선택 사항) */
-        body.is-admin .player-mask { display: none; }
     </style>
 </head>
 <body class="text-slate-900">
@@ -98,16 +83,15 @@
     <!-- 플레이어 모달 -->
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
         <div class="w-full max-w-5xl" onclick="event.stopPropagation()">
-            <div id="video-container" class="bg-black rounded-[24px] overflow-hidden aspect-video shadow-2xl relative">
-                <!-- 새 탭 열기 버튼 클릭 방지 마스크 -->
-                <div class="player-mask"></div>
-            </div>
+            <div id="video-container" class="bg-black rounded-[24px] overflow-hidden aspect-video shadow-2xl relative"></div>
             <div class="mt-6 flex justify-center gap-3">
                 <button onclick="closePlayer()" class="text-white bg-white/10 px-8 py-3 rounded-full font-bold backdrop-blur-md">닫기</button>
-                <button id="direct-view-btn" class="admin-only text-blue-400 bg-blue-400/10 px-8 py-3 rounded-full font-bold backdrop-blur-md">새 탭에서 열기 (관리자 전용)</button>
+                <!-- 관리자에게만 노출되는 우회 버튼 -->
+                <button id="direct-view-btn" class="admin-only text-blue-400 bg-blue-400/10 px-8 py-3 rounded-full font-bold backdrop-blur-md">원본 보기 (관리자용)</button>
             </div>
+            <!-- 관리자용 안내 문구 -->
             <div class="admin-only mt-4 text-center text-slate-400 text-xs font-medium justify-center">
-                * 인코딩 지연 시 위 '새 탭에서 열기' 버튼을 눌러 상태를 확인하세요.
+                * 인코딩 지연 시 위 '원본 보기' 버튼을 눌러 상태를 확인하세요.
             </div>
         </div>
     </div>
@@ -175,26 +159,16 @@
             const container = document.getElementById('video-container');
             const directBtn = document.getElementById('direct-view-btn');
             
-            // 기존 마스크 레이어 유지를 위해 innerHTML을 완전히 덮어쓰지 않고 iframe만 추가/변경
-            const existingIframe = container.querySelector('iframe');
-            if(existingIframe) existingIframe.remove();
+            container.innerHTML = `<iframe src="https://drive.google.com/file/d/${fileId}/preview" class="w-full h-full" allow="autoplay"></iframe>`;
             
-            const iframe = document.createElement('iframe');
-            // autoplay=1 파라미터와 allow 속성 추가로 자동재생 시도
-            iframe.src = `https://drive.google.com/file/d/${fileId}/preview?autoplay=1`;
-            iframe.className = "w-full h-full";
-            iframe.allow = "autoplay; encrypted-media";
-            
-            container.appendChild(iframe);
-            
+            // 관리자용 직접 링크 설정
             directBtn.onclick = () => window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+            
             document.getElementById('player-modal').classList.replace('hidden', 'flex');
         };
 
         window.closePlayer = () => {
-            const container = document.getElementById('video-container');
-            const iframe = container.querySelector('iframe');
-            if(iframe) iframe.remove();
+            document.getElementById('video-container').innerHTML = '';
             document.getElementById('player-modal').classList.replace('flex', 'hidden');
         };
 
@@ -206,15 +180,18 @@
             }
         };
 
+        // 관리자 모달 및 구글 인증 (간략화된 예시)
         window.initGoogleAuth = () => {
+            // 구글 로그인 팝업 로직은 기존 코드를 참조하여 여기에 위치
+            // 현재는 시뮬레이션을 위해 토큰 세팅 후 관리자 모드 활성화로 가정
             alert("관리자 로그인을 진행합니다.");
             sessionStorage.setItem('drive_token', 'temp_token');
             document.body.classList.add('is-admin');
-            location.reload();
         };
 
         window.openAdmin = () => {
             alert("영상 등록 모달을 엽니다.");
+            // 기존의 admin-modal 노출 로직 실행
         };
 
         window.filterVideos = (cat) => {
@@ -222,6 +199,7 @@
             buttons.forEach(btn => {
                 btn.classList.toggle('active', btn.innerText === cat);
             });
+            // 필터링 로직 구현...
         };
     </script>
 </body>
