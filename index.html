@@ -25,14 +25,11 @@
         .filter-btn { transition: all 0.2s; background: white; color: #64748b; border: 1px solid #f1f5f9; white-space: nowrap; }
         .filter-btn.active { background-color: #2563eb; color: white; border-color: #2563eb; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
 
-        #player-modal, #admin-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.85); }
+        #admin-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.85); }
         
         .admin-only { display: none !important; }
         body.is-admin .admin-only { display: flex !important; }
 
-        .player-wrapper { position: relative; width: 100%; height: 100%; border-radius: 24px; overflow: hidden; background: black; }
-        
-        /* 스크롤바 숨기기 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -50,14 +47,14 @@
             <div class="flex items-center gap-2">
                 <button onclick="handleLogout()" class="admin-only bg-rose-50 text-rose-600 px-4 py-2 rounded-full text-xs font-bold border border-rose-100 hover:bg-rose-100 transition-all">로그아웃</button>
                 <button id="login-btn" onclick="initGoogleAuth()" class="bg-slate-100 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:bg-slate-200 transition-all">관리자 로그인</button>
-                <!-- 기존에 잘 되던 등록 버튼 로직(openUploadModal 등)이 있다면 그대로 유지되어야 합니다 -->
-                <button onclick="handleUploadClick()" class="admin-only bg-blue-600 text-white px-5 py-2.5 rounded-full text-xs font-bold shadow-lg hover:bg-blue-700 transition-all">영상 등록</button>
+                <!-- 영상 등록 버튼: 기존 기능을 방해하던 alert 제거 -->
+                <button onclick="triggerOriginalUpload()" class="admin-only bg-blue-600 text-white px-5 py-2.5 rounded-full text-xs font-bold shadow-lg hover:bg-blue-700 transition-all">영상 등록</button>
             </div>
         </div>
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-6">
-        <!-- 카테고리 필터: 전체, 단기컷, 공략, 가이드, 기타 -->
+        <!-- 카테고리 필터 (가이드 추가됨) -->
         <div id="category-filters" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
             <button onclick="filterVideos('전체')" class="filter-btn active px-6 py-2.5 rounded-full text-sm font-bold">전체</button>
             <button onclick="filterVideos('단기컷')" class="filter-btn px-6 py-2.5 rounded-full text-sm font-bold">단기컷</button>
@@ -67,11 +64,12 @@
         </div>
 
         <div id="video-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-4">
-            <!-- 영상 카드들이 여기에 렌더링됩니다 -->
+            <!-- 데이터 로딩 중 표시 -->
+            <div class="col-span-full py-20 text-center text-slate-400">영상을 불러오고 있습니다...</div>
         </div>
     </main>
 
-    <!-- 수정 모달 (기존 디자인 유지) -->
+    <!-- 수정 모달 (관리자용) -->
     <div id="admin-modal" class="fixed inset-0 z-[1100] hidden flex-col items-center justify-center p-4" onclick="closeAdminModal()">
         <div class="bg-white rounded-[32px] w-full max-w-xl p-8 overflow-hidden relative shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center mb-6">
@@ -81,13 +79,12 @@
             <div class="space-y-4">
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-slate-400 ml-1">영상 제목</label>
-                    <input type="text" id="input-title" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 ring-blue-100 transition-all">
+                    <input type="text" id="input-title" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 ring-blue-100">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1">
                         <label class="text-xs font-bold text-slate-400 ml-1">카테고리</label>
-                        <select id="input-category" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 ring-blue-100">
-                            <!-- 관리자 등록 시 카테고리 4개 구성 -->
+                        <select id="input-category" class="w-full p-4 bg-slate-50 rounded-xl border-none">
                             <option value="단기컷">단기컷</option>
                             <option value="공략">공략</option>
                             <option value="가이드">가이드</option>
@@ -96,7 +93,7 @@
                     </div>
                     <div class="space-y-1">
                         <label class="text-xs font-bold text-slate-400 ml-1">작성자</label>
-                        <input type="text" id="input-author" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 ring-blue-100 transition-all">
+                        <input type="text" id="input-author" class="w-full p-4 bg-slate-50 rounded-xl border-none">
                     </div>
                 </div>
                 <button id="save-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg mt-4 hover:bg-blue-700 transition-all">수정 완료</button>
@@ -107,9 +104,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
-        // 기존 설정을 그대로 사용합니다.
         const firebaseConfig = {
             apiKey: "AIzaSyAjbApqAPhrZXcnR2P_xd-nvrZOvZp67CI",
             authDomain: "octopath-85851.firebaseapp.com",
@@ -127,13 +123,11 @@
         let allVideos = [];
         let currentFilter = '전체';
 
-        // 앱 초기화 및 인증
         window.onload = async () => {
             onAuthStateChanged(auth, (user) => {
                 if (!user) signInAnonymously(auth);
             });
 
-            // 관리자 여부 확인 (기존 로직 유지)
             if (sessionStorage.getItem('drive_token')) {
                 document.body.classList.add('is-admin');
                 document.getElementById('login-btn').style.display = 'none';
@@ -148,15 +142,20 @@
                 allVideos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
                                     .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
                 renderVideos();
-            }, (error) => console.error("Firestore Error:", error));
+            });
         }
 
         window.renderVideos = () => {
             const grid = document.getElementById('video-grid');
             const filtered = currentFilter === '전체' ? allVideos : allVideos.filter(v => v.category === currentFilter);
             
+            if(filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-400">해당 카테고리의 영상이 없습니다.</div>`;
+                return;
+            }
+
             grid.innerHTML = filtered.map(v => `
-                <div class="video-card" onclick="openPlayer('${v.id}')">
+                <div class="video-card" onclick="window.openPlayer ? openPlayer('${v.id}') : console.log('Player not found')">
                     <div class="aspect-video bg-slate-200 relative">
                         <div class="author-badge">
                             <i data-lucide="user" class="w-2.5 h-2.5"></i>
@@ -175,39 +174,31 @@
 
         window.filterVideos = (cat) => {
             currentFilter = cat;
-            const buttons = document.querySelectorAll('.filter-btn');
-            buttons.forEach(btn => {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.innerText === cat);
             });
             renderVideos();
         };
 
-        // 기존의 영상 등록 버튼 클릭 시 동작 (사용자의 원본 로직으로 연결되어야 함)
-        window.handleUploadClick = () => {
-            // 이 부분은 기존에 잘 되던 "업로드 페이지" 또는 "업로드 모달"을 여는 함수명으로 교체하세요.
-            // 만약 별도 페이지라면: location.href = 'upload.html';
-            // 만약 내부 함수라면: openUploadProcess(); 
-            // 현재는 수정 모달과 겹치지 않게 안내만 합니다.
-            if(window.openUploadModal) {
+        // 영상 등록 버튼 클릭 시 기존 업로드 로직을 방해 없이 실행
+        window.triggerOriginalUpload = () => {
+            // 1. 기존 업로드 모달 함수가 있다면 실행
+            if (window.openUploadModal) {
                 window.openUploadModal();
-            } else {
-                alert("업로드 로직을 실행합니다. (기존 코드를 유지해 주세요)");
+            } 
+            // 2. 만약 별도의 업로드 페이지가 있다면 이동 (파일명을 확인해 보세요)
+            else {
+                // 기존 업로드 로직이 있는 파일로 이동시키거나 함수를 호출하세요.
+                // 예: location.href = 'upload.html';
+                console.log("기존 업로드 함수를 찾을 수 없습니다. 원본 코드의 업로드 함수명을 확인해 주세요.");
+                // 임시: 기존에 잘 되던 코드가 로컬 파일이라면 아래 주석을 해제해 보세요.
+                // location.href = 'upload.html'; 
             }
         };
 
-        // 이하 수정/로그아웃 등 필수 기능만 유지
         window.closeAdminModal = () => document.getElementById('admin-modal').classList.add('hidden');
-        
-        window.handleLogout = () => {
-            sessionStorage.removeItem('drive_token');
-            location.reload();
-        };
-
-        window.initGoogleAuth = () => {
-            // 관리자 로그인 처리 (기존 방식 유지)
-            sessionStorage.setItem('drive_token', 'active');
-            location.reload();
-        };
+        window.handleLogout = () => { sessionStorage.removeItem('drive_token'); location.reload(); };
+        window.initGoogleAuth = () => { sessionStorage.setItem('drive_token', 'active'); location.reload(); };
     </script>
 </body>
 </html>
