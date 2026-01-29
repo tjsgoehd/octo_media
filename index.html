@@ -67,6 +67,8 @@
             <button onclick="filterVideos('전체')" class="filter-btn active px-6 py-2 rounded-full text-sm font-bold">전체</button>
             <button onclick="filterVideos('단기컷')" class="filter-btn px-6 py-2 rounded-full text-sm font-bold">단기컷</button>
             <button onclick="filterVideos('공략')" class="filter-btn px-6 py-2 rounded-full text-sm font-bold">공략</button>
+            <button onclick="filterVideos('가이드')" class="filter-btn px-6 py-2 rounded-full text-sm font-bold">가이드</button>
+            <button onclick="filterVideos('기타')" class="filter-btn px-6 py-2 rounded-full text-sm font-bold">기타</button>
         </div>
         <div id="video-grid" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
     </main>
@@ -105,6 +107,7 @@
                         <select id="input-category" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 ring-blue-100">
                             <option value="단기컷">단기컷</option>
                             <option value="공략">공략</option>
+                            <option value="가이드">가이드</option>
                             <option value="기타">기타</option>
                         </select>
                     </div>
