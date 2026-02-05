@@ -47,6 +47,10 @@
         body.is-admin .admin-only { display: flex !important; }
         body.is-admin .login-btn { display: none !important; }
 
+        /* 관리자가 아닐 때 구글 드라이브 외부링크 버튼 가리기 */
+        .drive-mask { position: absolute; top: 0; right: 0; width: 100px; height: 60px; z-index: 50; background: black; display: block; }
+        body.is-admin .drive-mask { display: none !important; }
+
         .wide-search-container { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; background-color: #f1f5f9; }
         .wide-search-container:focus-within { background-color: white; border-color: #2563eb; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1); }
 
@@ -158,6 +162,8 @@
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
         <div class="w-full max-w-5xl" onclick="event.stopPropagation()">
             <div id="video-frame" class="bg-black rounded-2xl md:rounded-[32px] overflow-hidden aspect-video shadow-2xl relative border border-white/10">
+                <!-- 관리자가 아닐 때 외부 링크 버튼을 가리는 마스크 -->
+                <div class="drive-mask"></div>
                 <iframe id="youtube-iframe" class="w-full h-full" src="" frameborder="0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
                 <div id="iframe-loader" class="absolute inset-0 z-10 loading-skeleton flex flex-col items-center justify-center">
                     <div class="w-8 h-8 md:w-10 md:h-10 border-3 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
@@ -411,7 +417,6 @@
             const iframe = document.getElementById('youtube-iframe');
             document.getElementById('iframe-loader').style.display = 'flex';
             
-            // 구글 드라이브 기본 플레이어 주소
             iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
             
             iframe.onload = () => {
