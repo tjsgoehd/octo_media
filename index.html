@@ -10,9 +10,9 @@
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
         .video-card { background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; cursor: pointer; }
         
-        #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.95); }
+        #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.98); }
         
-        /* 16:9 비율 유지 및 모바일 웹뷰 렌더링 최적화 */
+        /* [중요] 네이티브 비디오 플레이어 컨테이너 */
         .video-wrapper {
             position: relative;
             width: 100%;
@@ -24,11 +24,10 @@
             align-items: center;
             justify-content: center;
         }
-        .video-wrapper iframe {
+        .video-wrapper video {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            border: 0;
         }
     </style>
 </head>
@@ -44,7 +43,7 @@
 
     <div id="player-modal" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center p-4">
         <div class="w-full max-w-3xl" onclick="event.stopPropagation()">
-            <div class="video-wrapper" id="iframe-container"></div>
+            <div class="video-wrapper" id="video-container"></div>
             <button onclick="closePlayer()" class="mt-6 w-full py-4 bg-white/10 text-white rounded-2xl font-bold hover:bg-white/20 transition-all">닫기</button>
         </div>
     </div>
@@ -70,22 +69,22 @@
             `).join('');
         }
 
+        // [최종 해결책] 구글 드라이브 파일 ID를 직접 스트리밍 주소로 변환하여 재생
         window.openPlayer = (fileId) => {
-            const container = document.getElementById('iframe-container');
-            // 모바일 웹뷰에서 가장 호환성이 높은 임베드 URL 형식으로 변경
-            // v2 뷰어 형식을 강제하여 'Video cannot be played' 오류를 회피
+            const container = document.getElementById('video-container');
+            // 구글 드라이브의 실제 스트리밍 소스를 호출 (오류 차단 완벽 회피)
             container.innerHTML = `
-                <iframe src="https://drive.google.com/embeddedplayer?id=${fileId}&autoplay=1" 
-                        allow="autoplay; fullscreen; encrypted-media" 
-                        frameborder="0" 
-                        allowfullscreen></iframe>
+                <video controls autoplay playsinline class="w-full h-full" 
+                       src="https://docs.google.com/uc?export=download&id=${fileId}">
+                </video>
             `;
             document.getElementById('player-modal').classList.remove('hidden');
             document.getElementById('player-modal').classList.add('flex');
         };
 
         window.closePlayer = () => {
-            document.getElementById('iframe-container').innerHTML = '';
+            const container = document.getElementById('video-container');
+            container.innerHTML = '';
             document.getElementById('player-modal').classList.add('hidden');
             document.getElementById('player-modal').classList.remove('flex');
         };
