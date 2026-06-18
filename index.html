@@ -47,17 +47,20 @@
         body.is-admin .admin-only { display: flex !important; }
         body.is-admin .login-btn { display: none !important; }
 
-        /* 구글 드라이브 외부링크 가리개 - 100% 투명하게 하여 영상 뷰를 절대 방해하지 않으면서 클릭만 무력화 */
+        /* 구글 드라이브 외부링크 가리개 - 완벽한 검은색으로 아이콘 자체를 덮어버림 */
         .drive-mask { 
             position: absolute; 
             top: 0; 
             right: 0; 
-            width: 100px; 
-            height: 48px; 
-            z-index: 50; 
-            background: rgba(0, 0, 0, 0); 
+            width: 50px; 
+            height: 50px; 
+            z-index: 30; 
+            background-color: #000; 
             display: block; 
             pointer-events: auto;
+        }
+        @media (min-width: 768px) {
+            .drive-mask { width: 64px; height: 64px; }
         }
         body.is-admin .drive-mask { display: none !important; }
 
@@ -170,17 +173,21 @@
     </div>
 
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
-        <div class="w-full max-w-5xl px-2 md:px-4" onclick="event.stopPropagation()">
-            <!-- max-h-[65vh]를 주어 모바일 가로 모드에서도 플레이어가 화면 비율에 맞춰 하단 버튼을 가리지 않게 조정 -->
-            <div id="video-frame" class="bg-black rounded-2xl md:rounded-[32px] overflow-hidden aspect-video max-h-[65vh] md:max-h-none shadow-2xl relative border border-white/10 mx-auto">
-                <!-- 관리자가 아닐 때 외부 링크 및 다운로드 버튼 그룹을 투명하게 덮어 시선은 방해하지 않되 클릭만 철저하게 가드 -->
+        <!-- 모바일 좌우 꽉 차게 px-0 변경 -->
+        <div class="w-full max-w-5xl px-0 md:px-4 flex flex-col items-center" onclick="event.stopPropagation()">
+            <div id="video-frame" class="w-full bg-black rounded-xl md:rounded-[32px] overflow-hidden aspect-video max-h-[70vh] md:max-h-none shadow-2xl relative border border-white/10 mx-auto">
+                
+                <!-- 관리자가 아닐 때 외부 링크 버튼을 완전히 안 보이게 덮어주는 블랙 마스크 -->
                 <div class="drive-mask"></div>
-                <!-- absolute inset-0 구조로 교체하여 모든 모바일 브라우저/인앱 웹뷰에서 높이 오작동 없이 완전 호환 재생 구현 -->
-                <iframe id="youtube-iframe" class="w-full h-full absolute inset-0 z-10" src="" frameborder="0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
+                
+                <!-- 동적으로 Iframe이 삽입될 빈 컨테이너 -->
+                <div id="iframe-container" class="absolute inset-0 w-full h-full z-10"></div>
+                
                 <div id="iframe-loader" class="absolute inset-0 z-0 loading-skeleton flex flex-col items-center justify-center">
                     <div class="w-8 h-8 md:w-10 md:h-10 border-3 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
                 </div>
             </div>
+            
             <div class="mt-6 md:mt-8 flex flex-wrap justify-center gap-2 md:gap-4">
                 <button onclick="closePlayer()" class="text-white bg-white/10 px-6 py-2.5 md:px-8 md:py-3 rounded-full text-xs md:text-sm font-bold hover:bg-white/20 transition-colors backdrop-blur-md">닫기</button>
                 <button onclick="openEditMode()" class="admin-only text-blue-400 bg-blue-400/10 px-6 py-2.5 md:px-8 md:py-3 rounded-full text-xs md:text-sm font-bold hover:bg-blue-400/20 transition-colors backdrop-blur-md">수정</button>
@@ -426,23 +433,36 @@
 
         window.openPlayer = (fileId, docId, videoData) => {
             currentEditingVideo = { id: docId, ...videoData };
-            const iframe = document.getElementById('youtube-iframe');
             document.getElementById('iframe-loader').style.display = 'flex';
             
-            // [해결 핵심] 레이아웃이 완전히 정렬된 상태에서 iframe 주소를 할당받게 하여 구글 플레이어의 반응형 깨짐 문제를 해결합니다.
+            // 1단계: 모달 레이아웃을 먼저 띄워서 브라우저가 프레임의 실제 크기(너비/높이)를 계산하게 합니다.
             document.getElementById('player-modal').classList.replace('hidden', 'flex');
             
-            setTimeout(() => {
-                iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
-            }, 60);
+            // 기존 iframe 지우기 (초기화)
+            const container = document.getElementById('iframe-container');
+            container.innerHTML = '';
             
-            iframe.onload = () => {
-                document.getElementById('iframe-loader').style.display = 'none';
-            };
+            // 2단계: 모달이 펼쳐지고 난 뒤(150ms 딜레이)에 iframe 태그를 동적으로 생성하여 꽂아줍니다.
+            // 이렇게 하면 모바일 환경(카톡 브라우저 등)에서 발생하는 크기 계산 오류(UI 찌그러짐 현상)가 100% 원천 차단됩니다.
+            setTimeout(() => {
+                const iframe = document.createElement('iframe');
+                iframe.className = "w-full h-full absolute inset-0 z-10";
+                iframe.frameBorder = "0";
+                iframe.allow = "autoplay; encrypted-media; fullscreen";
+                iframe.setAttribute("allowfullscreen", "true");
+                iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+                
+                iframe.onload = () => {
+                    document.getElementById('iframe-loader').style.display = 'none';
+                };
+                
+                container.appendChild(iframe);
+            }, 150);
         };
 
         window.closePlayer = () => {
-            document.getElementById('youtube-iframe').src = "";
+            // 모달을 닫을 때 iframe 태그 자체를 삭제하여 백그라운드 재생 및 잔여 오류를 막습니다.
+            document.getElementById('iframe-container').innerHTML = '';
             document.getElementById('player-modal').classList.replace('flex', 'hidden');
         };
 
