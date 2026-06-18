@@ -47,22 +47,37 @@
         body.is-admin .admin-only { display: flex !important; }
         body.is-admin .login-btn { display: none !important; }
 
-        /* 구글 드라이브 외부링크 가리개 - 완벽한 검은색으로 아이콘 자체를 덮어버림 */
+        /* [핵심 수정 1] 구글 드라이브 외부링크 가리개 - 투명도 제거, 완벽한 블랙으로 아이콘 노출 자체를 100% 차단 */
         .drive-mask { 
             position: absolute; 
             top: 0; 
             right: 0; 
-            width: 50px; 
-            height: 50px; 
-            z-index: 30; 
+            width: 52px; 
+            height: 52px; 
+            z-index: 50; 
             background-color: #000; 
             display: block; 
             pointer-events: auto;
+            border-bottom-left-radius: 12px;
         }
         @media (min-width: 768px) {
-            .drive-mask { width: 64px; height: 64px; }
+            .drive-mask { width: 64px; height: 64px; border-bottom-left-radius: 16px; }
         }
         body.is-admin .drive-mask { display: none !important; }
+
+        /* [핵심 수정 2] 인앱 브라우저 호환성을 위한 16:9 비율 강제 고정 CSS */
+        .responsive-video {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            max-height: 70vh;
+        }
+        /* aspect-ratio를 지원하지 않는 구형 모바일 웹뷰(카톡 등)에서 찌그러짐 방지 */
+        @supports not (aspect-ratio: 16 / 9) {
+            .responsive-video {
+                height: auto;
+                padding-top: 56.25%;
+            }
+        }
 
         .wide-search-container { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; background-color: #f1f5f9; }
         .wide-search-container:focus-within { background-color: white; border-color: #2563eb; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1); }
@@ -123,6 +138,7 @@
         <div id="video-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-7"></div>
     </main>
 
+    <!-- 업로드 모달 -->
     <div id="admin-modal" class="fixed inset-0 z-[1100] hidden items-center justify-center p-4">
         <div class="bg-white w-full max-w-xl rounded-[32px] md:rounded-[40px] p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div class="flex justify-between items-center mb-6 md:mb-8">
@@ -166,26 +182,31 @@
         </div>
     </div>
 
+    <!-- 로딩 오버레이 -->
     <div id="loading-overlay" class="fixed inset-0 z-[2000] hidden flex-col items-center justify-center text-white text-center p-6">
         <div class="w-12 h-12 md:w-14 md:h-14 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mb-6"></div>
         <p id="loading-text" class="font-extrabold text-lg md:text-xl"></p>
         <p id="loading-sub" class="text-slate-300 text-xs md:sm mt-2"></p>
     </div>
 
+    <!-- 플레이어 모달 -->
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
-        <!-- 모바일 좌우 꽉 차게 px-0 변경 -->
         <div class="w-full max-w-5xl px-0 md:px-4 flex flex-col items-center" onclick="event.stopPropagation()">
-            <div id="video-frame" class="w-full bg-black rounded-xl md:rounded-[32px] overflow-hidden aspect-video max-h-[70vh] md:max-h-none shadow-2xl relative border border-white/10 mx-auto">
+            
+            <!-- [핵심 수정 3] responsive-video 클래스를 통해 높이 계산을 완벽히 보장 -->
+            <div id="video-frame" class="responsive-video relative bg-black rounded-xl md:rounded-[32px] overflow-hidden shadow-2xl border border-white/10 mx-auto">
                 
-                <!-- 관리자가 아닐 때 외부 링크 버튼을 완전히 안 보이게 덮어주는 블랙 마스크 -->
-                <div class="drive-mask"></div>
-                
-                <!-- 동적으로 Iframe이 삽입될 빈 컨테이너 -->
-                <div id="iframe-container" class="absolute inset-0 w-full h-full z-10"></div>
-                
-                <div id="iframe-loader" class="absolute inset-0 z-0 loading-skeleton flex flex-col items-center justify-center">
+                <!-- 1. 가장 밑에 깔리는 로더 -->
+                <div id="iframe-loader" class="absolute inset-0 z-0 flex items-center justify-center">
                     <div class="w-8 h-8 md:w-10 md:h-10 border-3 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
                 </div>
+
+                <!-- 2. 동적 생성되는 iframe 컨테이너 -->
+                <div id="iframe-container" class="absolute inset-0 w-full h-full z-10"></div>
+                
+                <!-- [핵심 수정 4] HTML 구조상 iframe 컨테이너보다 '아래(뒤)'에 작성하여, 무조건 iframe 위로 렌더링되게 강제함 -->
+                <div class="drive-mask"></div>
+                
             </div>
             
             <div class="mt-6 md:mt-8 flex flex-wrap justify-center gap-2 md:gap-4">
@@ -435,19 +456,14 @@
             currentEditingVideo = { id: docId, ...videoData };
             document.getElementById('iframe-loader').style.display = 'flex';
             
-            // 1단계: 모달 레이아웃을 먼저 띄워서 브라우저가 프레임의 실제 크기(너비/높이)를 계산하게 합니다.
             document.getElementById('player-modal').classList.replace('hidden', 'flex');
             
-            // 기존 iframe 지우기 (초기화)
             const container = document.getElementById('iframe-container');
             container.innerHTML = '';
             
-            // 2단계: 모달이 펼쳐지고 난 뒤(150ms 딜레이)에 iframe 태그를 동적으로 생성하여 꽂아줍니다.
-            // 이렇게 하면 모바일 환경(카톡 브라우저 등)에서 발생하는 크기 계산 오류(UI 찌그러짐 현상)가 100% 원천 차단됩니다.
             setTimeout(() => {
                 const iframe = document.createElement('iframe');
-                iframe.className = "w-full h-full absolute inset-0 z-10";
-                iframe.frameBorder = "0";
+                iframe.className = "absolute top-0 left-0 w-full h-full border-0 z-10";
                 iframe.allow = "autoplay; encrypted-media; fullscreen";
                 iframe.setAttribute("allowfullscreen", "true");
                 iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
@@ -457,11 +473,10 @@
                 };
                 
                 container.appendChild(iframe);
-            }, 150);
+            }, 50);
         };
 
         window.closePlayer = () => {
-            // 모달을 닫을 때 iframe 태그 자체를 삭제하여 백그라운드 재생 및 잔여 오류를 막습니다.
             document.getElementById('iframe-container').innerHTML = '';
             document.getElementById('player-modal').classList.replace('flex', 'hidden');
         };
