@@ -47,37 +47,22 @@
         body.is-admin .admin-only { display: flex !important; }
         body.is-admin .login-btn { display: none !important; }
 
-        /* [핵심 수정 1] 구글 드라이브 외부링크 가리개 - 투명도 제거, 완벽한 블랙으로 아이콘 노출 자체를 100% 차단 */
+        /* [핵심] 구글 드라이브 아이콘을 완벽히 지워버리는 물리적 블랙 패치 */
         .drive-mask { 
             position: absolute; 
             top: 0; 
             right: 0; 
-            width: 52px; 
-            height: 52px; 
+            width: 48px; 
+            height: 48px; 
             z-index: 50; 
             background-color: #000; 
             display: block; 
             pointer-events: auto;
-            border-bottom-left-radius: 12px;
         }
         @media (min-width: 768px) {
-            .drive-mask { width: 64px; height: 64px; border-bottom-left-radius: 16px; }
+            .drive-mask { width: 56px; height: 56px; border-bottom-left-radius: 12px; }
         }
         body.is-admin .drive-mask { display: none !important; }
-
-        /* [핵심 수정 2] 인앱 브라우저 호환성을 위한 16:9 비율 강제 고정 CSS */
-        .responsive-video {
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            max-height: 70vh;
-        }
-        /* aspect-ratio를 지원하지 않는 구형 모바일 웹뷰(카톡 등)에서 찌그러짐 방지 */
-        @supports not (aspect-ratio: 16 / 9) {
-            .responsive-video {
-                height: auto;
-                padding-top: 56.25%;
-            }
-        }
 
         .wide-search-container { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; background-color: #f1f5f9; }
         .wide-search-container:focus-within { background-color: white; border-color: #2563eb; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1); }
@@ -191,20 +176,19 @@
 
     <!-- 플레이어 모달 -->
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
-        <div class="w-full max-w-5xl px-0 md:px-4 flex flex-col items-center" onclick="event.stopPropagation()">
+        <!-- [핵심] 가로모드 시 버튼이 안보이는 문제를 방지하기 위해 max-width를 화면 높이에 맞춰 동적으로 제한 -->
+        <div class="w-full flex flex-col items-center" style="max-width: min(1024px, 120vh);" onclick="event.stopPropagation()">
             
-            <!-- [핵심 수정 3] responsive-video 클래스를 통해 높이 계산을 완벽히 보장 -->
-            <div id="video-frame" class="responsive-video relative bg-black rounded-xl md:rounded-[32px] overflow-hidden shadow-2xl border border-white/10 mx-auto">
+            <!-- [핵심] 웹뷰 엔진 버그를 원천 차단하는 절대 비율 16:9 컨테이너 (padding-bottom 56.25% 신공) -->
+            <div id="video-frame" class="w-full relative bg-black rounded-xl md:rounded-[32px] overflow-hidden shadow-2xl border border-white/10" style="padding-bottom: 56.25%; height: 0;">
                 
-                <!-- 1. 가장 밑에 깔리는 로더 -->
-                <div id="iframe-loader" class="absolute inset-0 z-0 flex items-center justify-center">
+                <div id="iframe-loader" class="absolute top-0 left-0 w-full h-full z-0 flex items-center justify-center">
                     <div class="w-8 h-8 md:w-10 md:h-10 border-3 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
                 </div>
 
-                <!-- 2. 동적 생성되는 iframe 컨테이너 -->
-                <div id="iframe-container" class="absolute inset-0 w-full h-full z-10"></div>
+                <div id="iframe-container" class="absolute top-0 left-0 w-full h-full z-10"></div>
                 
-                <!-- [핵심 수정 4] HTML 구조상 iframe 컨테이너보다 '아래(뒤)'에 작성하여, 무조건 iframe 위로 렌더링되게 강제함 -->
+                <!-- 관리자가 아닐 때 구글 드라이브 공유 아이콘을 가려버리는 블랙 마스크 -->
                 <div class="drive-mask"></div>
                 
             </div>
@@ -461,9 +445,10 @@
             const container = document.getElementById('iframe-container');
             container.innerHTML = '';
             
+            // 모달 레이아웃이 화면에 완전히 잡힌 후 iframe을 삽입하여 안정성 100% 보장
             setTimeout(() => {
                 const iframe = document.createElement('iframe');
-                iframe.className = "absolute top-0 left-0 w-full h-full border-0 z-10";
+                iframe.className = "absolute top-0 left-0 w-full h-full border-0";
                 iframe.allow = "autoplay; encrypted-media; fullscreen";
                 iframe.setAttribute("allowfullscreen", "true");
                 iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
