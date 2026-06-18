@@ -12,7 +12,7 @@
         
         #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.95); }
         
-        /* 모바일 웹뷰 최적화: 16:9 비율 고정 및 렌더링 오류 방지 */
+        /* 16:9 비율 유지 및 모바일 웹뷰 렌더링 최적화 */
         .video-wrapper {
             position: relative;
             width: 100%;
@@ -20,6 +20,9 @@
             background: #000;
             border-radius: 12px;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .video-wrapper iframe {
             position: absolute;
@@ -67,13 +70,13 @@
             `).join('');
         }
 
-        // [최종 수정] 렌더링 오류 방지를 위한 구글 드라이브 비디오 뷰어 강제 호출 방식
         window.openPlayer = (fileId) => {
             const container = document.getElementById('iframe-container');
-            // 'embeddedplayer' 대신 직접 뷰어 주소를 사용하여 권한 및 렌더링 오류 해결
+            // 모바일 웹뷰에서 가장 호환성이 높은 임베드 URL 형식으로 변경
+            // v2 뷰어 형식을 강제하여 'Video cannot be played' 오류를 회피
             container.innerHTML = `
-                <iframe src="https://drive.google.com/file/d/${fileId}/preview" 
-                        allow="autoplay; fullscreen" 
+                <iframe src="https://drive.google.com/embeddedplayer?id=${fileId}&autoplay=1" 
+                        allow="autoplay; fullscreen; encrypted-media" 
                         frameborder="0" 
                         allowfullscreen></iframe>
             `;
