@@ -47,8 +47,24 @@
         body.is-admin .admin-only { display: flex !important; }
         body.is-admin .login-btn { display: none !important; }
 
-        /* 관리자가 아닐 때 구글 드라이브 외부링크 버튼 가리기 */
-        .drive-mask { position: absolute; top: 0; right: 0; width: 100px; height: 60px; z-index: 50; background: black; display: block; }
+        /* 구글 드라이브 외부링크 가리개 - 영상 컨텐츠를 가리지 않도록 최적 영역 축소 */
+        .drive-mask { 
+            position: absolute; 
+            top: 0; 
+            right: 0; 
+            width: 44px; 
+            height: 44px; 
+            z-index: 50; 
+            background: #000; 
+            display: block; 
+            pointer-events: auto;
+        }
+        @media (min-width: 768px) {
+            .drive-mask {
+                width: 56px; 
+                height: 56px; 
+            }
+        }
         body.is-admin .drive-mask { display: none !important; }
 
         .wide-search-container { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; background-color: #f1f5f9; }
@@ -160,12 +176,12 @@
     </div>
 
     <div id="player-modal" class="fixed inset-0 z-[1000] hidden flex-col items-center justify-center p-4" onclick="closePlayer()">
-        <div class="w-full max-w-5xl" onclick="event.stopPropagation()">
+        <div class="w-full max-w-5xl px-2 md:px-4" onclick="event.stopPropagation()">
             <div id="video-frame" class="bg-black rounded-2xl md:rounded-[32px] overflow-hidden aspect-video shadow-2xl relative border border-white/10">
-                <!-- 관리자가 아닐 때 외부 링크 버튼을 가리는 마스크 -->
+                <!-- 관리자가 아닐 때 외부 링크 버튼을 가리는 정밀 마스크 -->
                 <div class="drive-mask"></div>
-                <iframe id="youtube-iframe" class="w-full h-full" src="" frameborder="0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
-                <div id="iframe-loader" class="absolute inset-0 z-10 loading-skeleton flex flex-col items-center justify-center">
+                <iframe id="youtube-iframe" class="w-full h-full relative z-10" src="" frameborder="0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
+                <div id="iframe-loader" class="absolute inset-0 z-0 loading-skeleton flex flex-col items-center justify-center">
                     <div class="w-8 h-8 md:w-10 md:h-10 border-3 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
                 </div>
             </div>
@@ -417,13 +433,17 @@
             const iframe = document.getElementById('youtube-iframe');
             document.getElementById('iframe-loader').style.display = 'flex';
             
-            iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+            // [해결 핵심 1] 찌그러짐 현상 방지를 위해 먼저 부모 모달 클래스를 활성화하여 완벽한 너비/높이를 확보한 후 iframe.src를 설정합니다.
+            document.getElementById('player-modal').classList.replace('hidden', 'flex');
+            
+            // 모달이 정렬될 수 있도록 아주 미세한 딜레이를 준 뒤 소스를 할당하여, 모바일 드라이브 플레이어의 스크립트가 크기 오작동을 피하도록 설계합니다.
+            setTimeout(() => {
+                iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+            }, 60);
             
             iframe.onload = () => {
                 document.getElementById('iframe-loader').style.display = 'none';
             };
-
-            document.getElementById('player-modal').classList.replace('hidden', 'flex');
         };
 
         window.closePlayer = () => {
