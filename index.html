@@ -12,6 +12,7 @@
         
         #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.98); }
         
+        /* [모바일 최적화] 영상 컨테이너 및 아이프레임 터치 이벤트 개선 */
         .video-wrapper {
             position: relative;
             width: 100%;
@@ -22,12 +23,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            pointer-events: auto; /* 터치 이벤트 허용 */
         }
         .video-wrapper iframe {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             border: 0;
+            z-index: 10;
         }
     </style>
 </head>
@@ -63,7 +66,6 @@
             const grid = document.getElementById('video-grid');
             grid.innerHTML = videos.map(v => `
                 <div class="video-card" onclick="openPlayer('${v.fileId}')">
-                    <!-- 썸네일 경로를 전용 썸네일 API로 변경하여 표시 오류 방지 -->
                     <img src="https://lh3.googleusercontent.com/d/${v.fileId}" 
                          onerror="this.src='https://placehold.co/640x360?text=이미지없음'"
                          class="w-full aspect-video object-cover">
@@ -74,11 +76,12 @@
 
         window.openPlayer = (fileId) => {
             const container = document.getElementById('video-container');
-            // 구글 드라이브 뷰어를 iframe으로 안전하게 삽입
+            // 모바일 웹뷰에서 컨트롤러가 나오도록 autoplay와 권한 설정 강화
             container.innerHTML = `
                 <iframe src="https://drive.google.com/file/d/${fileId}/preview" 
-                        allow="autoplay; fullscreen" 
-                        allowfullscreen></iframe>
+                        allow="autoplay; fullscreen; encrypted-media" 
+                        allowfullscreen 
+                        style="pointer-events: auto;"></iframe>
             `;
             document.getElementById('player-modal').classList.remove('hidden');
             document.getElementById('player-modal').classList.add('flex');
