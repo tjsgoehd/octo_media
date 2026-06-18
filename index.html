@@ -10,17 +10,16 @@
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
         .video-card { background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; cursor: pointer; }
         
-        /* 모달 및 로더 */
-        #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.9); }
+        #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.95); }
         
-        /* [중요] 플레이어 교체: 16:9 비율 유지 및 모바일 웹뷰 최적화 */
+        /* 모바일 웹뷰 최적화: 16:9 비율 고정 및 렌더링 오류 방지 */
         .video-wrapper {
             position: relative;
             width: 100%;
-            padding-bottom: 56.25%; /* 16:9 강제 비율 */
+            padding-bottom: 56.25%;
             background: #000;
+            border-radius: 12px;
             overflow: hidden;
-            border-radius: 20px;
         }
         .video-wrapper iframe {
             position: absolute;
@@ -28,30 +27,22 @@
             width: 100%; height: 100%;
             border: 0;
         }
-
-        .admin-only { display: none; }
-        body.is-admin .admin-only { display: flex; }
     </style>
 </head>
 <body class="bg-slate-50">
 
-    <!-- 간소화된 헤더 -->
     <header class="bg-white border-b border-slate-200 p-4 sticky top-0 z-50">
         <div class="max-w-5xl mx-auto flex justify-between items-center">
             <h1 class="font-extrabold text-xl tracking-tighter">옥튜브</h1>
-            <button id="admin-login-btn" onclick="requestToken()" class="text-xs bg-slate-100 px-4 py-2 rounded-full font-bold">관리자 로그인</button>
         </div>
     </header>
 
     <main class="max-w-5xl mx-auto p-4 grid grid-cols-2 md:grid-cols-4 gap-4" id="video-grid"></main>
 
-    <!-- 플레이어 모달 -->
     <div id="player-modal" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center p-4">
         <div class="w-full max-w-3xl" onclick="event.stopPropagation()">
-            <div class="video-wrapper" id="iframe-container">
-                <!-- iframe이 여기에 동적으로 삽입됨 -->
-            </div>
-            <button onclick="closePlayer()" class="mt-6 w-full py-4 bg-white/10 text-white rounded-2xl font-bold">닫기</button>
+            <div class="video-wrapper" id="iframe-container"></div>
+            <button onclick="closePlayer()" class="mt-6 w-full py-4 bg-white/10 text-white rounded-2xl font-bold hover:bg-white/20 transition-all">닫기</button>
         </div>
     </div>
 
@@ -66,7 +57,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // 영상 렌더링 함수
         function renderVideos(videos) {
             const grid = document.getElementById('video-grid');
             grid.innerHTML = videos.map(v => `
@@ -77,12 +67,15 @@
             `).join('');
         }
 
-        // [핵심] 플레이어 교체: preview 대신 embeddedplayer 사용 (공유 버튼 제거/렌더 오류 방지)
+        // [최종 수정] 렌더링 오류 방지를 위한 구글 드라이브 비디오 뷰어 강제 호출 방식
         window.openPlayer = (fileId) => {
             const container = document.getElementById('iframe-container');
+            // 'embeddedplayer' 대신 직접 뷰어 주소를 사용하여 권한 및 렌더링 오류 해결
             container.innerHTML = `
-                <iframe src="https://drive.google.com/embeddedplayer?id=${fileId}&autoplay=1" 
-                        allow="autoplay" frameborder="0"></iframe>
+                <iframe src="https://drive.google.com/file/d/${fileId}/preview" 
+                        allow="autoplay; fullscreen" 
+                        frameborder="0" 
+                        allowfullscreen></iframe>
             `;
             document.getElementById('player-modal').classList.remove('hidden');
             document.getElementById('player-modal').classList.add('flex');
@@ -94,7 +87,6 @@
             document.getElementById('player-modal').classList.remove('flex');
         };
 
-        // 데이터 로드
         onSnapshot(collection(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos'), (snap) => {
             renderVideos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
