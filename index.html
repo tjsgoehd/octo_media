@@ -8,30 +8,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
-        .video-card { background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; cursor: pointer; }
-        
-        #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.98); }
-        
-        /* [모바일 최적화] 영상 컨테이너 및 아이프레임 터치 이벤트 개선 */
-        .video-wrapper {
-            position: relative;
-            width: 100%;
-            padding-bottom: 56.25%;
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: auto; /* 터치 이벤트 허용 */
-        }
-        .video-wrapper iframe {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            border: 0;
-            z-index: 10;
-        }
+        .video-card { background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; }
+        .video-card:active { transform: scale(0.98); }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -44,13 +22,6 @@
 
     <main class="max-w-5xl mx-auto p-4 grid grid-cols-2 md:grid-cols-4 gap-4" id="video-grid"></main>
 
-    <div id="player-modal" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center p-4">
-        <div class="w-full max-w-3xl" onclick="event.stopPropagation()">
-            <div class="video-wrapper" id="video-container"></div>
-            <button onclick="closePlayer()" class="mt-6 w-full py-4 bg-white/10 text-white rounded-2xl font-bold hover:bg-white/20 transition-all">닫기</button>
-        </div>
-    </div>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
@@ -62,10 +33,18 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // [중요 수정] 이제 iframe을 띄우지 않습니다. 
+        // 모바일 웹뷰의 렌더링 제한을 완벽히 피하기 위해, 브라우저가 직접 비디오 앱을 열게 합니다.
+        window.openVideo = (fileId) => {
+            // 구글 드라이브의 원본 파일 직접 링크
+            const url = `https://drive.google.com/file/d/${fileId}/view`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+        };
+
         function renderVideos(videos) {
             const grid = document.getElementById('video-grid');
             grid.innerHTML = videos.map(v => `
-                <div class="video-card" onclick="openPlayer('${v.fileId}')">
+                <div class="video-card" onclick="openVideo('${v.fileId}')">
                     <img src="https://lh3.googleusercontent.com/d/${v.fileId}" 
                          onerror="this.src='https://placehold.co/640x360?text=이미지없음'"
                          class="w-full aspect-video object-cover">
@@ -73,25 +52,6 @@
                 </div>
             `).join('');
         }
-
-        window.openPlayer = (fileId) => {
-            const container = document.getElementById('video-container');
-            // 모바일 웹뷰에서 컨트롤러가 나오도록 autoplay와 권한 설정 강화
-            container.innerHTML = `
-                <iframe src="https://drive.google.com/file/d/${fileId}/preview" 
-                        allow="autoplay; fullscreen; encrypted-media" 
-                        allowfullscreen 
-                        style="pointer-events: auto;"></iframe>
-            `;
-            document.getElementById('player-modal').classList.remove('hidden');
-            document.getElementById('player-modal').classList.add('flex');
-        };
-
-        window.closePlayer = () => {
-            document.getElementById('video-container').innerHTML = '';
-            document.getElementById('player-modal').classList.add('hidden');
-            document.getElementById('player-modal').classList.remove('flex');
-        };
 
         onSnapshot(collection(db, 'artifacts', 'octopath-85851', 'public', 'data', 'videos'), (snap) => {
             renderVideos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
