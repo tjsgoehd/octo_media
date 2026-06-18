@@ -9,10 +9,8 @@
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
         .video-card { background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; }
         .video-card:active { transform: scale(0.98); }
-        
-        #player-modal { backdrop-filter: blur(20px); background-color: rgba(0, 0, 0, 0.95); }
-        .video-wrapper { position: relative; width: 100%; padding-bottom: 56.25%; background: #000; border-radius: 12px; overflow: hidden; }
-        .video-wrapper video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+        .thumbnail-container { position: relative; aspect-ratio: 16/9; overflow: hidden; }
+        .play-icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -25,13 +23,6 @@
 
     <main class="max-w-5xl mx-auto p-4 grid grid-cols-2 md:grid-cols-4 gap-4" id="video-grid"></main>
 
-    <div id="player-modal" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center p-4">
-        <div class="w-full max-w-3xl" onclick="event.stopPropagation()">
-            <div class="video-wrapper" id="video-container"></div>
-            <button onclick="closePlayer()" class="mt-6 w-full py-4 bg-white/10 text-white rounded-2xl font-bold">닫기</button>
-        </div>
-    </div>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
@@ -43,33 +34,25 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // [최종 방식] 웹 페이지 내에서 HTML5 비디오 태그로 직접 스트리밍
-        // 구글 드라이브의 원본 파일 직접 다운로드/스트림 엔드포인트를 사용
-        window.openPlayer = (fileId) => {
-            const container = document.getElementById('video-container');
-            container.innerHTML = `
-                <video controls autoplay playsinline class="w-full h-full" 
-                       src="https://docs.google.com/uc?export=download&id=${fileId}"
-                       type="video/mp4"></video>
-            `;
-            document.getElementById('player-modal').classList.remove('hidden');
-            document.getElementById('player-modal').classList.add('flex');
-        };
-
-        window.closePlayer = () => {
-            const container = document.getElementById('video-container');
-            container.innerHTML = '';
-            document.getElementById('player-modal').classList.add('hidden');
-            document.getElementById('player-modal').classList.remove('flex');
+        // [최종 해결책] 모바일 재생 오류를 완벽하게 차단하기 위한 브라우저 오픈 방식
+        // 드라이브 앱으로 강제 이동하지 않고, 브라우저에서 최적화된 뷰어 모드로 열립니다.
+        window.openVideo = (fileId) => {
+            const url = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+            window.open(url, '_blank', 'noopener');
         };
 
         function renderVideos(videos) {
             const grid = document.getElementById('video-grid');
             grid.innerHTML = videos.map(v => `
-                <div class="video-card" onclick="openPlayer('${v.fileId}')">
-                    <img src="https://lh3.googleusercontent.com/d/${v.fileId}" 
-                         onerror="this.src='https://placehold.co/640x360?text=이미지없음'"
-                         class="w-full aspect-video object-cover">
+                <div class="video-card" onclick="openVideo('${v.fileId}')">
+                    <div class="thumbnail-container">
+                        <img src="https://lh3.googleusercontent.com/d/${v.fileId}" 
+                             onerror="this.src='https://placehold.co/640x360?text=영상확인'"
+                             class="w-full h-full object-cover">
+                        <div class="play-icon">
+                            <svg class="w-12 h-12 text-white opacity-80" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                    </div>
                     <div class="p-3"><h3 class="font-bold text-sm line-clamp-2">${v.title || '제목없음'}</h3></div>
                 </div>
             `).join('');
